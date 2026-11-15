@@ -593,19 +593,201 @@ class GameEngine3D {
   }
 
   scatterMartianRocks() {
-    const rockMat = new THREE.MeshStandardMaterial({
-      color: 0x6e2a16, // Dark weathered basalt
-      roughness: 0.96,
-      metalness: 0.08
-    });
-    const slabMat = new THREE.MeshStandardMaterial({
-      color: 0x7c341c, // Layered sedimentary Martian shale
-      roughness: 0.92,
-      metalness: 0.05
+    // -------------------------------------------------------------
+    // REALISTIC NASA-GROUNDED MARTIAN ROCKS & BASALT VENTIFACTS
+    // Inspired by Mars Rover imaging (Perseverance, Curiosity, Spirit)
+    // -------------------------------------------------------------
+
+    // 1. Generate High-Res Procedural Basalt & Dust Textures (Created once on Canvas)
+    const rockCanvas = document.createElement('canvas');
+    rockCanvas.width = 512;
+    rockCanvas.height = 512;
+    const rCtx = rockCanvas.getContext('2d');
+
+    // Deep volcanic basalt background (iron/magnesium silicate matrix)
+    rCtx.fillStyle = '#261c16';
+    rCtx.fillRect(0, 0, 512, 512);
+
+    // Weathered iron-oxide (Fe2O3) Martian dust layer drifting across surface
+    const dustGrad = rCtx.createLinearGradient(0, 0, 512, 512);
+    dustGrad.addColorStop(0, 'rgba(184, 76, 36, 0.65)');
+    dustGrad.addColorStop(0.35, 'rgba(138, 54, 24, 0.45)');
+    dustGrad.addColorStop(0.7, 'rgba(84, 32, 16, 0.3)');
+    dustGrad.addColorStop(1, 'rgba(206, 92, 45, 0.55)');
+    rCtx.fillStyle = dustGrad;
+    rCtx.fillRect(0, 0, 512, 512);
+
+    // Aeolian wind abrasion micro-striations (aeolian ventifact scour lines)
+    rCtx.strokeStyle = 'rgba(215, 105, 52, 0.18)';
+    rCtx.lineWidth = 1.5;
+    for (let l = 0; l < 45; l++) {
+      const y = Math.random() * 512;
+      rCtx.beginPath();
+      rCtx.moveTo(0, y);
+      rCtx.lineTo(512, y + (Math.random() - 0.5) * 50);
+      rCtx.stroke();
+    }
+
+    // Basalt vesicles (dark volcanic pitting) and mineral speckles
+    for (let p = 0; p < 4000; p++) {
+      const px = Math.random() * 512;
+      const py = Math.random() * 512;
+      const pr = Math.random() * 2.2 + 0.5;
+      const isPit = Math.random() < 0.45;
+      rCtx.fillStyle = isPit ? 'rgba(18, 12, 9, 0.75)' : 'rgba(235, 120, 60, 0.4)';
+      rCtx.beginPath();
+      rCtx.arc(px, py, pr, 0, Math.PI * 2);
+      rCtx.fill();
+    }
+
+    const rockTex = new THREE.CanvasTexture(rockCanvas);
+    rockTex.wrapS = THREE.RepeatWrapping;
+    rockTex.wrapT = THREE.RepeatWrapping;
+
+    // Bump Map for micro-relief, pits and crystalline roughness
+    const rockBumpCanvas = document.createElement('canvas');
+    rockBumpCanvas.width = 256;
+    rockBumpCanvas.height = 256;
+    const rbCtx = rockBumpCanvas.getContext('2d');
+    rbCtx.fillStyle = '#808080';
+    rbCtx.fillRect(0, 0, 256, 256);
+    for (let bp = 0; bp < 2800; bp++) {
+      const bx = Math.random() * 256;
+      const by = Math.random() * 256;
+      const br = Math.random() * 2.2 + 0.5;
+      rbCtx.fillStyle = Math.random() < 0.45 ? '#353535' : '#c8c8c8';
+      rbCtx.beginPath();
+      rbCtx.arc(bx, by, br, 0, Math.PI * 2);
+      rbCtx.fill();
+    }
+    const rockBumpTex = new THREE.CanvasTexture(rockBumpCanvas);
+    rockBumpTex.wrapS = THREE.RepeatWrapping;
+    rockBumpTex.wrapT = THREE.RepeatWrapping;
+
+    // Sedimentary Layered Slab Canvas (for mudstone/shale flags)
+    const slabCanvas = document.createElement('canvas');
+    slabCanvas.width = 512;
+    slabCanvas.height = 256;
+    const sCtx = slabCanvas.getContext('2d');
+    sCtx.fillStyle = '#652a16';
+    sCtx.fillRect(0, 0, 512, 256);
+    // Sedimentary mudstone laminations
+    for (let band = 0; band < 256; band += 8) {
+      const shade = Math.sin(band * 0.14) > 0 ? 'rgba(185, 84, 38, 0.4)' : 'rgba(75, 28, 14, 0.5)';
+      sCtx.fillStyle = shade;
+      sCtx.fillRect(0, band, 512, 7);
+    }
+    for (let sp = 0; sp < 1200; sp++) {
+      sCtx.fillStyle = 'rgba(215, 115, 60, 0.35)';
+      sCtx.beginPath();
+      sCtx.arc(Math.random() * 512, Math.random() * 256, Math.random() * 1.8 + 0.5, 0, Math.PI * 2);
+      sCtx.fill();
+    }
+    const slabTex = new THREE.CanvasTexture(slabCanvas);
+    slabTex.wrapS = THREE.RepeatWrapping;
+    slabTex.wrapT = THREE.RepeatWrapping;
+
+    // 2. High-Fidelity Materials with NASA color palettes
+    const basaltMat = new THREE.MeshStandardMaterial({
+      color: 0x5a2a19, // Weathered dark volcanic basalt
+      map: rockTex,
+      bumpMap: rockBumpTex,
+      bumpScale: 0.08,
+      roughness: 0.94,
+      metalness: 0.06,
+      flatShading: true
     });
 
-    // 1. Scattered Boulders & Craggy Rocks (Image 1)
-    for (let i = 0; i < 75; i++) {
+    const dustyMat = new THREE.MeshStandardMaterial({
+      color: 0x7c381d, // Dust-encrusted reddish Mars rock
+      map: rockTex,
+      bumpMap: rockBumpTex,
+      bumpScale: 0.07,
+      roughness: 0.96,
+      metalness: 0.04,
+      flatShading: true
+    });
+
+    const slabMat = new THREE.MeshStandardMaterial({
+      color: 0x76321a, // Sedimentary mudstone slab
+      map: slabTex,
+      bumpMap: rockBumpTex,
+      bumpScale: 0.06,
+      roughness: 0.90,
+      metalness: 0.05,
+      flatShading: true
+    });
+
+    const pebbleMat = new THREE.MeshStandardMaterial({
+      color: 0x642a17, // Small volcanic pebbles
+      roughness: 0.92,
+      metalness: 0.06,
+      flatShading: true
+    });
+
+    // 3. Watertight Continuous Deformer (Prevents tearing/detached triangles)
+    const deformRockGeometry = (baseGeo, seed, scaleX, scaleY, scaleZ, ventifactStrength = 0.25) => {
+      const pos = baseGeo.attributes.position;
+      const v = new THREE.Vector3();
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i);
+        const len = v.length() || 1.0;
+        const nx = v.x / len;
+        const ny = v.y / len;
+        const nz = v.z / len;
+
+        // Continuous harmonic spherical displacement (shared coordinates receive identical deformation)
+        const h1 = Math.sin(nx * 2.8 + seed) * Math.cos(ny * 2.5 + seed * 1.3) * Math.sin(nz * 2.7 + seed * 0.7);
+        const h2 = Math.sin(nx * 5.4 + nz * 4.6 + seed * 2.1) * 0.32;
+        const h3 = Math.cos(ny * 6.1 + nx * 5.0 + seed * 3.4) * 0.18;
+
+        // Aeolian windward facet (aerodynamic plane carved by Martian dust storms)
+        const windward = Math.max(0, nx * 0.7 + ny * 0.45 - 0.2);
+        const facet = Math.pow(windward, 2) * ventifactStrength;
+
+        const factor = 1.0 + (h1 + h2 + h3) * 0.22 - facet;
+
+        v.x = nx * len * factor * scaleX;
+        v.y = ny * len * factor * scaleY;
+        v.z = nz * len * factor * scaleZ;
+
+        // Smoothly flatten bottom so the boulder beds realistically into the sand
+        if (v.y < 0) {
+          v.y *= 0.45;
+        }
+
+        pos.setXYZ(i, v.x, v.y, v.z);
+      }
+      baseGeo.computeVertexNormals();
+      return baseGeo;
+    };
+
+    // 4. Pre-bake Master Geometries (Maximum GPU performance and zero memory bloat)
+    const masterGeos = [
+      deformRockGeometry(new THREE.DodecahedronGeometry(1.0, 1), 1.1, 1.25, 0.72, 1.05, 0.28), // Ventifact boulder
+      deformRockGeometry(new THREE.IcosahedronGeometry(1.0, 1), 3.7, 1.12, 0.82, 1.18, 0.18),  // Rounded basalt block
+      deformRockGeometry(new THREE.DodecahedronGeometry(1.0, 1), 6.4, 1.35, 0.65, 0.95, 0.35), // Wind-fluted keel rock
+      deformRockGeometry(new THREE.IcosahedronGeometry(1.0, 1), 8.2, 0.95, 0.88, 0.95, 0.15)   // Compact volcanic stone
+    ];
+
+    // Master slab geometry (faceted cylinder slab with chipped edges)
+    const masterSlabGeo = new THREE.CylinderGeometry(1.0, 1.22, 0.24, 7);
+    const slabPos = masterSlabGeo.attributes.position;
+    for (let sp = 0; sp < slabPos.count; sp++) {
+      const sx = slabPos.getX(sp);
+      const sy = slabPos.getY(sp);
+      const sz = slabPos.getZ(sp);
+      const noise = (Math.sin(sx * 4.0) + Math.cos(sz * 4.0)) * 0.04;
+      slabPos.setXYZ(sp, sx * (1.0 + noise), sy, sz * (1.0 + noise));
+    }
+    masterSlabGeo.computeVertexNormals();
+
+    // Master pebble geometry (for realistic lag gravel around boulders)
+    const masterPebbleGeo = new THREE.DodecahedronGeometry(1.0, 0);
+
+    // 5. Scatter Main Boulders
+    const boulderCount = 75;
+    for (let i = 0; i < boulderCount; i++) {
       const x = (Math.random() - 0.5) * 260;
       const z = (Math.random() - 0.5) * 260;
 
@@ -614,48 +796,75 @@ class GameEngine3D {
       if (Math.hypot(x + 85, z + 85) < 32) continue;
       if (Math.hypot(x + 15, z + 10) < 14) continue;
 
-      const scale = 0.5 + Math.random() * 2.4;
-      const geo = new THREE.DodecahedronGeometry(scale, 1);
+      const scale = 0.5 + Math.random() * 2.2;
+      const geoIndex = i % masterGeos.length;
+      const mat = (i % 2 === 0) ? basaltMat : dustyMat;
 
-      const pos = geo.attributes.position;
-      for (let p = 0; p < pos.count; p++) {
-        pos.setX(p, pos.getX(p) * (0.8 + Math.random() * 0.4));
-        pos.setY(p, pos.getY(p) * (0.7 + Math.random() * 0.4));
-        pos.setZ(p, pos.getZ(p) * (0.8 + Math.random() * 0.4));
-      }
-      geo.computeVertexNormals();
+      const rock = new THREE.Mesh(masterGeos[geoIndex], mat);
+      rock.scale.set(scale, scale, scale);
 
-      const rock = new THREE.Mesh(geo, rockMat);
-      const y = this.getTerrainHeight(x, z) + scale * 0.35;
+      // Embedded naturally into the sand (never floating!)
+      const groundY = this.getTerrainHeight(x, z);
+      const y = groundY + scale * 0.12; // Lower 30% rests submerged in the dune
       rock.position.set(x, y, z);
-      rock.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+      rock.rotation.set(
+        (Math.random() - 0.5) * 0.2,
+        Math.random() * Math.PI * 2,
+        (Math.random() - 0.5) * 0.2
+      );
       rock.castShadow = true;
       rock.receiveShadow = true;
       this.scene.add(rock);
 
+      // Sphere collider for player collision and rover stealth mechanics
       this.colliders.push({
         type: 'sphere',
         x: x,
         z: z,
         radius: scale * 0.85
       });
+
+      // 6. Spawn authentic "Lag Gravel" / Pebble clusters around large boulders (NASA photo realism)
+      if (scale > 1.4 && i % 3 === 0) {
+        const pebbleCount = 3 + Math.floor(Math.random() * 3);
+        for (let p = 0; p < pebbleCount; p++) {
+          const pAngle = Math.random() * Math.PI * 2;
+          const pDist = scale * 0.9 + Math.random() * 1.4;
+          const px = x + Math.cos(pAngle) * pDist;
+          const pz = z + Math.sin(pAngle) * pDist;
+          const pScale = 0.12 + Math.random() * 0.22;
+          const pebble = new THREE.Mesh(masterPebbleGeo, pebbleMat);
+          pebble.scale.set(pScale, pScale * 0.65, pScale);
+          pebble.position.set(px, this.getTerrainHeight(px, pz) + pScale * 0.15, pz);
+          pebble.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+          pebble.castShadow = false; // Disable shadows on tiny pebbles for maximum FPS
+          pebble.receiveShadow = true;
+          this.scene.add(pebble);
+        }
+      }
     }
 
-    // 2. Flat Shale Slabs (Matching foreground rocks in Image 1!)
-    for (let s = 0; s < 30; s++) {
-      const x = (Math.random() - 0.5) * 220;
-      const z = (Math.random() - 0.5) * 220;
+    // 7. Scatter Flat Sedimentary Shale Slabs (Matching Jezero Crater / Gale Crater mudstones)
+    for (let s = 0; s < 32; s++) {
+      const x = (Math.random() - 0.5) * 230;
+      const z = (Math.random() - 0.5) * 230;
       if (Math.hypot(x, z - 25) < 14) continue;
       if (Math.hypot(x + 85, z + 85) < 30) continue;
 
-      const slabW = 1.6 + Math.random() * 2.2;
-      const slabL = 1.2 + Math.random() * 1.8;
-      const slabH = 0.18 + Math.random() * 0.22;
-      const slabGeo = new THREE.BoxGeometry(slabW, slabH, slabL);
-      const slab = new THREE.Mesh(slabGeo, slabMat);
-      const y = this.getTerrainHeight(x, z) + slabH * 0.4;
-      slab.position.set(x, y, z);
-      slab.rotation.set((Math.random() - 0.5) * 0.25, Math.random() * Math.PI, (Math.random() - 0.5) * 0.25);
+      const slabW = 1.4 + Math.random() * 2.0;
+      const slabL = 1.0 + Math.random() * 1.6;
+      const slabH = 0.6 + Math.random() * 0.8;
+
+      const slab = new THREE.Mesh(masterSlabGeo, slabMat);
+      slab.scale.set(slabW, slabH, slabL);
+      const groundY = this.getTerrainHeight(x, z);
+      slab.position.set(x, groundY + 0.04, z);
+      // Slight tilt aligning with slope/dune
+      slab.rotation.set(
+        (Math.random() - 0.5) * 0.2,
+        Math.random() * Math.PI * 2,
+        (Math.random() - 0.5) * 0.2
+      );
       slab.castShadow = true;
       slab.receiveShadow = true;
       this.scene.add(slab);
