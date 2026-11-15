@@ -52,6 +52,8 @@ class GameEngine3D {
     this.colliders = [];
     this.raycaster = null;
     this.hoveredObject = null;
+    this.sealKitWaypoint = null;
+    this.sealKitLight = null;
 
     // Rover & Dynamic Objects
     this.rover = null;
@@ -1302,14 +1304,33 @@ class GameEngine3D {
     strut.position.set(cx + 4.5, cy + 1.2, cz + 2.5);
     group.add(strut);
 
+    // Shattered titanium hull panel in playable area near player approach
+    const wingPanelGeo = new THREE.BoxGeometry(2.6, 0.14, 1.5);
+    const wingPanel = new THREE.Mesh(wingPanelGeo, hullMat);
+    wingPanel.rotation.set(0.32, 0.85, -0.18);
+    wingPanel.position.set(-11.8, this.getTerrainHeight(-11.8, -7.6) + 0.28, -7.6);
+    wingPanel.castShadow = true;
+    wingPanel.receiveShadow = true;
+    group.add(wingPanel);
+
+    // Broken scorched thruster nozzle fragment partially buried in sand
+    const nozzleGeo = new THREE.CylinderGeometry(0.45, 0.72, 1.1, 12);
+    const nozzle = new THREE.Mesh(nozzleGeo, scorchMat);
+    nozzle.rotation.set(1.15, 0.35, 0.55);
+    nozzle.position.set(-10.4, this.getTerrainHeight(-10.4, -7.2) + 0.3, -7.2);
+    nozzle.castShadow = true;
+    nozzle.receiveShadow = true;
+    group.add(nozzle);
+
     this.scene.add(group);
 
+    // Fuselage structural collider (protects main core while leaving surrounding debris accessible)
     this.colliders.push({
       type: 'box',
-      minX: cx - 5.5,
-      maxX: cx + 5.5,
-      minZ: cz - 4.5,
-      maxZ: cz + 4.5
+      minX: cx - 4.5,
+      maxX: cx + 3.2,
+      minZ: cz - 4.0,
+      maxZ: cz + 3.2
     });
   }
 
@@ -2059,6 +2080,81 @@ class GameEngine3D {
     return group;
   }
 
+  // High-visibility Emergency EVA Suit Pressure Seal Kit Model
+  createSuitSealKitModel() {
+    const group = new THREE.Group();
+
+    // 1. Rugged NASA Emergency EVA Medical / Patch Case (0.65m x 0.26m x 0.45m)
+    const caseGeo = new THREE.BoxGeometry(0.65, 0.26, 0.45);
+    const caseMat = new THREE.MeshStandardMaterial({
+      color: 0xf5f5f5, // Medical emergency white
+      metalness: 0.35,
+      roughness: 0.35
+    });
+    const caseMesh = new THREE.Mesh(caseGeo, caseMat);
+    caseMesh.position.y = 0.13;
+    caseMesh.castShadow = true;
+    caseMesh.receiveShadow = true;
+    group.add(caseMesh);
+
+    // 2. High-Visibility Safety Orange Perimeter Bumper
+    const bumperGeo = new THREE.BoxGeometry(0.69, 0.1, 0.49);
+    const bumperMat = new THREE.MeshStandardMaterial({
+      color: 0xff6600, // Safety warning orange
+      roughness: 0.45,
+      metalness: 0.1
+    });
+    const bumper = new THREE.Mesh(bumperGeo, bumperMat);
+    bumper.position.y = 0.13;
+    group.add(bumper);
+
+    // 3. Prominent Emergency Cross Symbol on Lid (Neon Emerald Green / Cyan)
+    const crossMat = new THREE.MeshBasicMaterial({ color: 0x00ff88 });
+    const crossH = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.02, 0.08), crossMat);
+    crossH.position.set(0, 0.27, 0);
+    group.add(crossH);
+    const crossV = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.02, 0.24), crossMat);
+    crossV.position.set(0, 0.27, 0);
+    group.add(crossV);
+
+    // 4. Heavy-Duty Pressure Latches (Carbon-black & titanium)
+    const latchMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.85, roughness: 0.2 });
+    const latchGeo = new THREE.BoxGeometry(0.06, 0.12, 0.04);
+    const latchL = new THREE.Mesh(latchGeo, latchMat);
+    latchL.position.set(-0.2, 0.14, 0.23);
+    group.add(latchL);
+    const latchR = new THREE.Mesh(latchGeo, latchMat);
+    latchR.position.set(0.2, 0.14, 0.23);
+    group.add(latchR);
+
+    // 5. Carrying Handle
+    const handleGeo = new THREE.BoxGeometry(0.22, 0.04, 0.04);
+    const handle = new THREE.Mesh(handleGeo, latchMat);
+    handle.position.set(0, 0.14, 0.25);
+    group.add(handle);
+
+    // 6. Active Sealant LED Status Bar (Glowing Cyan)
+    const ledGeo = new THREE.BoxGeometry(0.18, 0.03, 0.02);
+    const ledMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+    const led = new THREE.Mesh(ledGeo, ledMat);
+    led.position.set(0, 0.22, 0.23);
+    group.add(led);
+
+    // 7. Dynamic Cyan Glow PointLight (Illuminates surrounding debris)
+    this.sealKitLight = new THREE.PointLight(0x00ffcc, 2.2, 10);
+    this.sealKitLight.position.set(0, 0.5, 0);
+    group.add(this.sealKitLight);
+
+    // 8. Floating Holographic Waypoint Diamond (visible above dunes & rocks)
+    const beaconGeo = new THREE.OctahedronGeometry(0.3, 0);
+    const beaconMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, wireframe: true });
+    this.sealKitWaypoint = new THREE.Mesh(beaconGeo, beaconMat);
+    this.sealKitWaypoint.position.set(0, 1.6, 0);
+    group.add(this.sealKitWaypoint);
+
+    return group;
+  }
+
   // ==========================================
   // SPAWN MISSION-SPECIFIC INTERACTABLES
   // ==========================================
@@ -2088,11 +2184,13 @@ class GameEngine3D {
     const crateMat = new THREE.MeshStandardMaterial({ color: 0xdd6622, metalness: 0.3, roughness: 0.6 });
 
     if (missionId === 1) {
-      // 1. Suit Patch Kit
-      const patchGeo = new THREE.BoxGeometry(0.4, 0.15, 0.4);
-      const patchMesh = new THREE.Mesh(patchGeo, new THREE.MeshStandardMaterial({ color: 0x00cc88 }));
-      addInteractable('pickup', 'suit_patch', '[E] Pick up Suit Pressure Seal Kit', -14, -8, 0.2, patchMesh, () => {
+      // 1. Suit Patch Kit — placed prominently beside wreckage debris in open playable area
+      const sealKitModel = this.createSuitSealKitModel();
+      addInteractable('pickup', 'suit_patch', '[E] Pick up Suit Pressure Seal Kit', -11.0, -7.0, 0.15, sealKitModel, () => {
         window.gameState.addItem('suit_patch');
+        if (this.sealKitLight) this.sealKitLight.intensity = 0;
+        if (this.sealKitWaypoint) this.sealKitWaypoint.visible = false;
+        if (window.soundSystem) window.soundSystem.playInteract();
         if (window.uiManager) window.uiManager.showBanner("🩹 SUIT PRESSURE SEAL KIT ACQUIRED! Open Inventory [Tab] to apply.");
       });
 
@@ -2462,6 +2560,15 @@ class GameEngine3D {
     if (this.flightRecorderLight) {
       const flash = Math.sin(this.clock.getElapsedTime() * 8) > 0.35 ? 2.6 : 0.4;
       this.flightRecorderLight.intensity = flash;
+    }
+
+    // 2b. Suit Pressure Seal Kit beacon diamond rotation & pulse
+    if (this.sealKitWaypoint && this.sealKitWaypoint.visible) {
+      this.sealKitWaypoint.rotation.y += delta * 2.2;
+      this.sealKitWaypoint.position.y = 1.6 + Math.sin(this.clock.getElapsedTime() * 4) * 0.1;
+    }
+    if (this.sealKitLight && this.sealKitLight.intensity > 0) {
+      this.sealKitLight.intensity = 1.8 + Math.sin(this.clock.getElapsedTime() * 5) * 0.6;
     }
 
     // 3. Detailed Supply Crate waypoint markers & LED beacons

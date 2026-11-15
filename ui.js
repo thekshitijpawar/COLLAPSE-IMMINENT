@@ -464,7 +464,7 @@ class UIManager {
     const curObj = window.gameState.missionObjectives.find(o => !o.completed);
 
     if (curObj) {
-      if (curObj.id === 'seal_suit') target = { x: -14, z: -8 };
+      if (curObj.id === 'seal_suit') target = { x: -11.0, z: -7.0 };
       else if (curObj.id === 'find_supplies') target = { x: -15, z: -12 };
       else if (curObj.id === 'find_keycard') target = { x: -13.5, z: -9.5 };
       else if (curObj.id === 'reach_hab') target = { x: 0, z: 12 };
