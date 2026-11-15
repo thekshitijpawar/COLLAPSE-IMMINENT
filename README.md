@@ -1,11 +1,6 @@
-# COLLAPSE: IMMINENT 🚀
+# MARS: BEYOND SURVIVAL 🚀
 ### 3D First-Person Mars Survival, Exploration & Suspense Adventure
 *A competition-level, fully playable first-person 3D survival game for Google Antigravity (Ages 9–15)*
-
-[![Live Demo](https://img.shields.io/badge/Play%20Online-GitHub%20Pages-brightgreen?style=for-the-badge&logo=github)](https://thekshitijpawar.github.io/COLLAPSE-IMMINENT/)
-
-**🌐 Play Live on GitHub Pages**: [https://thekshitijpawar.github.io/COLLAPSE-IMMINENT/](https://thekshitijpawar.github.io/COLLAPSE-IMMINENT/)  
-**📻 Standalone Prequel**: [https://thekshitijpawar.github.io/COLLAPSE-IMMINENT/rescue-failed.html](https://thekshitijpawar.github.io/COLLAPSE-IMMINENT/rescue-failed.html)
 
 ---
 
@@ -162,12 +157,12 @@ All gameplay elements clearly distinguish simulated gameplay values from real sc
 
 ## 📂 Project Structure
 
-- [`index.html`](./index.html): 3D canvas, HUD telemetry, helmet visor frame, inventory modal, map modal, puzzle overlays, and cutscenes.
-- [`rescue-failed.html`](./rescue-failed.html): Standalone interactive single-page cliffhanger prequel website (*Rescue Failed*) featuring Commander Reyes, animated rocket descent/crash, screen shake, audio teletype, and the mysterious radio warning.
-- [`style.css`](./style.css): NASA/JPL sci-fi aesthetics, Orbitron/Rajdhani typography, glassmorphism telemetry panels, CRT scanlines, and animated gauges.
-- [`gameEngine3D.js`](./gameEngine3D.js): Three.js WebGL engine, terrain generator, viewmodel gloves, raycasting interactions, rover AI patrol, and physics.
-- [`gameState.js`](./gameState.js): Resource tracking (O2, Water, Food, Battery, Radiation), inventory store, 5 mission definitions, checkpoints, and NASA science data.
-- [`puzzles.js`](./puzzles.js): Interactive Level 2, 3, and 5 puzzle mechanics and modal handlers.
-- [`audio.js`](./audio.js): Procedural Web Audio API sound synthesizer with zero external assets.
-- [`ui.js`](./ui.js): HUD telemetry loop, compass waypoint calculator, tactical map canvas, inventory renderer, and cinematics.
-- [`app.js`](./app.js): Application bootstrap, game loop, pointer lock coordinator, and mission transition manager.
+- [`index.html`](file:///c:/Users/harsh/Desktop/JAM/index.html): 3D canvas, HUD telemetry, helmet visor frame, inventory modal, map modal, puzzle overlays, and cutscenes.
+- [`rescue-failed.html`](file:///c:/Users/harsh/Desktop/JAM/rescue-failed.html): Standalone interactive single-page cliffhanger prequel website (*Rescue Failed*) featuring Commander Reyes, animated rocket descent/crash, screen shake, audio teletype, and the mysterious radio warning.
+- [`style.css`](file:///c:/Users/harsh/Desktop/JAM/style.css): NASA/JPL sci-fi aesthetics, Orbitron/Rajdhani typography, glassmorphism telemetry panels, CRT scanlines, and animated gauges.
+- [`gameEngine3D.js`](file:///c:/Users/harsh/Desktop/JAM/gameEngine3D.js): Three.js WebGL engine, terrain generator, viewmodel gloves, raycasting interactions, rover AI patrol, and physics.
+- [`gameState.js`](file:///c:/Users/harsh/Desktop/JAM/gameState.js): Resource tracking (O2, Water, Food, Battery, Radiation), inventory store, 5 mission definitions, checkpoints, and NASA science data.
+- [`puzzles.js`](file:///c:/Users/harsh/Desktop/JAM/puzzles.js): Interactive Level 2, 3, and 5 puzzle mechanics and modal handlers.
+- [`audio.js`](file:///c:/Users/harsh/Desktop/JAM/audio.js): Procedural Web Audio API sound synthesizer with zero external assets.
+- [`ui.js`](file:///c:/Users/harsh/Desktop/JAM/ui.js): HUD telemetry loop, compass waypoint calculator, tactical map canvas, inventory renderer, and cinematics.
+- [`app.js`](file:///c:/Users/harsh/Desktop/JAM/app.js): Application bootstrap, game loop, pointer lock coordinator, and mission transition manager.
