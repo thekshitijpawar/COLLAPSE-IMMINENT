@@ -45,66 +45,6 @@ const NASA_SCIENCE_DATA = {
 };
 
 const ITEM_DATABASE = {
-  packaged_ration: {
-    id: 'packaged_ration',
-    name: 'Packaged Survival Ration',
-    icon: '🍱',
-    category: 'consumable',
-    desc: 'Vacuum-sealed freeze-dried astronaut meal pouch. High caloric density formulated for deep space survival.',
-    science: 'NASA deep-space rations use retort pouches providing 3,000 kcal with balanced macronutrients.',
-    consumable: true,
-    effect: { food: 35 }
-  },
-  emergency_food: {
-    id: 'emergency_food',
-    name: 'Emergency Food Rations',
-    icon: '📦',
-    category: 'consumable',
-    desc: 'Compressed emergency survival food blocks fortified with vitamins and electrolytes.',
-    science: 'Formulated to sustain extreme metabolic exertion during planetary surface EVAs.',
-    consumable: true,
-    effect: { food: 40, energy: 10 }
-  },
-  canned_food: {
-    id: 'canned_food',
-    name: 'Martian Protein Rations',
-    icon: '🥫',
-    category: 'consumable',
-    desc: 'Sterilized hermetically sealed tin of nutrient-rich protein meal.',
-    science: 'Canned provisions provide multi-year shelf stability against cosmic radiation degradation.',
-    consumable: true,
-    effect: { food: 30 }
-  },
-  nutrition_bar: {
-    id: 'nutrition_bar',
-    name: 'High-Calorie Nutrition Bar',
-    icon: '🍫',
-    category: 'consumable',
-    desc: 'Compact energy bar enriched with complex carbohydrates and amino acids.',
-    science: 'Provides rapid glycogen replenishment during high-intensity planetary surface EVAs.',
-    consumable: true,
-    effect: { food: 25, energy: 15 }
-  },
-  water_pouch: {
-    id: 'water_pouch',
-    name: 'Pure Hydration Supply',
-    icon: '💧',
-    category: 'consumable',
-    desc: 'Microfiltered potable water pouch with suit valved drinking connector.',
-    science: 'Maintains osmotic balance and prevents dehydration hypovolemia under low atmospheric pressure.',
-    consumable: true,
-    effect: { water: 35 }
-  },
-  survival_medkit: {
-    id: 'survival_medkit',
-    name: 'Emergency Survival Supplies',
-    icon: '🩹',
-    category: 'consumable',
-    desc: 'Comprehensive survival kit containing biomedical stimulants and electrolyte salts.',
-    science: 'Essential for stabilizing vital signs and cellular homeostasis in harsh extraterrestrial environments.',
-    consumable: true,
-    effect: { oxygen: 20, water: 20, food: 20, energy: 20 }
-  },
   suit_patch: {
     id: 'suit_patch',
     name: 'Suit Pressure Seal Kit',
@@ -221,24 +161,24 @@ const ITEM_DATABASE = {
 const MISSIONS = [
   {
     id: 1,
-    title: "LEVEL 1 — THE DESCENT & SURVIVAL",
-    location: "Ares Starship Landing Zone • Acidalia Basin",
-    weather: "Dust Haze Atmosphere • 218 K (-55°C)",
-    radiationLevel: 0.04,
-    briefing: "Commander Reyes, your SpaceX-inspired interplanetary spacecraft has touched down on Mars after the long voyage from Earth. Atmospheric telemetry is nominal and your spacesuit is pressurized. Step onto the Martian surface, explore the landing perimeter, locate dark carbon-fibre storage containers to collect vital food supplies and water rations, retrieve the Habitat Alpha Security Keycard from the mission data terminal, and reach Habitat Alpha to establish shelter.",
-    scienceFocus: "Martian Atmospheric Pressure (0.6% Earth) & Deep Space Survival Logistics",
+    title: "LEVEL 1 — RESCUE LOST",
+    location: "Ares Rescue Crash Site • Acidalia Basin",
+    weather: "Thin Dust Haze • 215 K (-58°C)",
+    radiationLevel: 0.05,
+    briefing: "Commander Reyes, stranded on Mars. Earth launched the Ares Rescue rocket to extract you. But moments ago on atmospheric descent, the rocket suffered a catastrophic engine failure and crashed 2 km away in Acidalia Basin. Telemetry confirmed: YOU ARE STILL ALONE. FIND ANOTHER WAY HOME. Trek out across the vast desert to the burning wreckage, patch your venting suit, unlock the Flight Data Recorder black box (Passcode: 412) to salvage the Habitat Alpha Security Keycard, and reach shelter.",
+    scienceFocus: "Martian Atmospheric Pressure (0.6% Earth) & Suit Depressurization Dynamics",
     startingResources: {
-      oxygen: 95,
-      water: 90,
-      food: 90,
-      energy: 95,
-      radiation: 1.8
+      oxygen: 65,
+      water: 70,
+      food: 75,
+      energy: 85,
+      radiation: 2.1
     },
     objectives: [
-      { id: 'explore_site', text: "Survey landing perimeter & discover Carbon Storage Boxes (0/2)", completed: false, count: 0, target: 2 },
-      { id: 'collect_food', text: "Collect food rations & water packs from carbon storage containers (0/3)", completed: false, count: 0, target: 3 },
-      { id: 'find_keycard', text: "Recover Habitat Alpha Security Keycard from mission flight terminal", completed: false },
-      { id: 'reach_hab', text: "Trek across the plains to Habitat Alpha and cycle the pressurized airlock", completed: false }
+      { id: 'seal_suit', text: "Inspect damaged spacesuit & patch pressure leak with Suit Seal Kit", completed: false },
+      { id: 'find_supplies', text: "Search scattered rescue cargo pods for emergency O2, water, and food", completed: false, count: 0, target: 3 },
+      { id: 'find_keycard', text: "Unlock Flight Data Recorder in Ares Rescue wreckage for Habitat Keycard", completed: false },
+      { id: 'reach_hab', text: "Trek across the plain to Habitat Alpha and cycle the pressurized airlock", completed: false }
     ],
     nextProblem: "The habitat's power supply is critically low. Solar array is completely offline."
   },
@@ -349,14 +289,14 @@ class GameState {
     this.gameCompleted = false;
 
     this.resources = {
-      oxygen: 95,
-      water: 90,
-      food: 90,
-      energy: 95,
-      radiation: 1.8
+      oxygen: 65,
+      water: 70,
+      food: 75,
+      energy: 85,
+      radiation: 2.1
     };
 
-    this.suitBreached = false;
+    this.suitBreached = true;
     this.flashlightOn = false;
     this.stamina = 100;
     this.isSprinting = false;
@@ -432,7 +372,7 @@ class GameState {
     this.missionObjectives = JSON.parse(JSON.stringify(missionDef.objectives));
 
     if (!isRetry) {
-      this.suitBreached = false;
+      this.suitBreached = (missionId === 1);
       if (missionId === 1 || !this.resources) {
         this.resources = { ...missionDef.startingResources };
         this.inventory = [];
@@ -524,19 +464,8 @@ class GameState {
         this.resources.food = Math.min(100, this.resources.food + item.effect.food);
         effectText.push(`+${item.effect.food}% Food`);
       }
-      if (item.effect.energy) {
-        this.resources.energy = Math.min(100, this.resources.energy + item.effect.energy);
-        effectText.push(`+${item.effect.energy}% Battery`);
-      }
       this.removeItem(itemId);
-      if (window.soundSystem) {
-        if (item.effect.food || item.effect.water) {
-          if (window.soundSystem.playFoodConsume) window.soundSystem.playFoodConsume();
-          else window.soundSystem.playInteract();
-        } else {
-          window.soundSystem.playInteract();
-        }
-      }
+      if (window.soundSystem) window.soundSystem.playInteract();
       return { success: true, message: `Used ${item.name} (${effectText.join(', ')})` };
     }
 

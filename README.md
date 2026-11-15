@@ -80,47 +80,11 @@ Gameplay takes inspiration from the suspense, exploration, item collection, and 
      * Mount components onto dish feed horn.
      * Solve Earth Tracking Dish alignment puzzle (Azimuth 248°, Elevation 34° accounting for 14-minute signal delay).
      * Transmit high-gain emergency burst to Earth rescue command.
-   - **Final Spaceship Escape & Giant Tentacle Cliffhanger (Epic Climax)**:
-     1. Commander Reyes boards the SpaceX-inspired Starship on Mars and powers up flight avionics.
-     2. The Raptor vacuum and sea-level engines ignite with thunderous thrust and shock diamonds.
-     3. The Starship lifts off the Martian surface and accelerates through the atmosphere into deep space.
-     4. Mars shrinks into a distant red marble; Earth appears ahead. The player feels triumphant relief.
-     5. SUDDENLY, a terrifying subterranean/cosmic roar reverberates through the cosmos.
-     6. An ENORMOUS, COLOSSAL ALIEN TENTACLE emerges from the void beneath the ship!
-     7. The tentacle violently curls around the stainless steel fuselage, constricting and crushing the metal hull.
-     8. Structural groaning audio, violent screen shake, and cockpit emergency red alert sirens blaring!
-     9. The monster drags the struggling spaceship down into the dark abyss.
-     10. Dramatic orchestral tension swell cuts to COMPLETE BLACK with the unforgettable cliffhanger title screen:
-         > **"SOMETHING FROM BENEATH HAS YOU..."**  
-         > **MARS: BEYOND SURVIVAL — CHAPTER 01 CLIFFHANGER**  
-         > **TO BE CONTINUED IN CHAPTER 02**  
-
----
-
-## 🪐 Visual Environment & Architectural Realism (Reference Inspirations)
-
-- **Mars Environment & Sky (Reference Image 1)**:
-  * Sweeping Martian sand dunes with fine wind ripples, weathered basalt boulders, and flat shale slabs casting dramatic long shadows.
-  * Inverted Mars sky dome featuring rich orange-to-terracotta atmospheric scattering and drifting cirrus ice-dust clouds.
-  * 360-degree perimeter ring of 48 rugged distant mountain peaks and crater rims giving immense planetary scale.
-  * Futuristic Mars Research Colony featuring multiple cylindrical space habitats (Habitats Alpha, Beta, Gamma, and Delta) with segmented metallic shells, dark reinforcement ribs, circular observation window portals, support stilts with leveling pads, and interconnected pressurized passageways.
-  * Authentic white EVA astronauts exploring the dunes near the base, complete with golden reflective visors, PLSS backpacks, and chest control units.
-  * Futuristic 6-wheel planetary exploration rover with multi-pane panoramic observation glass, rocker-bogie articulated suspension, rooftop parabolic dish, and high-intensity headlights.
-  * Interactive Carbon-Fibre Storage Containers constructed with dark 2x2 twill carbon weave, titanium corner brackets, dual heavy latches, and biometric LED status bars (cyan -> green).
-  * Real 3D survival supplies inside containers: packaged astronaut ration pouches, canned protein rations, high-calorie nutrition bars, and potable water packs that collect into inventory and replenish vitals.
-  * Futuristic Mars Research Colony featuring multiple cylindrical space habitats (Habitats Alpha, Beta, Gamma, and Delta) with segmented metallic shells, dark reinforcement ribs, circular observation window portals, support stilts with leveling pads, and interconnected pressurized passageways.
-  * Authentic white EVA astronauts exploring the dunes near the base, complete with golden reflective visors, PLSS backpacks, and chest control units.
-  * Futuristic 6-wheel planetary exploration rover with multi-pane panoramic observation glass, rocker-bogie articulated suspension, rooftop parabolic dish, and high-intensity headlights.
-
-- **SpaceX-Inspired Rocket Design & Earth Launch Facility**:
-  * Massive heavy space launch stack inspired by SpaceX Starship and Super Heavy booster architecture.
-  * Mirrored stainless steel 304L cylindrical fuselage with real-time specular reflectivity.
-  * Hexagonal ceramic thermal protection tile array lining the windward heat shield.
-  * Actuated forward aerodynamic flaps (canards) and aft delta body flaps.
-  * Super Heavy booster with 4 titanium lattice grid fins, interstage venting, and 33 Raptor engine cluster.
-  * Mechazilla Launch Tower: 65m structural steel lattice tower with articulated "chopsticks" catching carriage and quick-disconnect cryogenic umbilical arm.
-  * Cryogenic propellant tank farm with liquid oxygen and liquid methane spherical tanks and vapor venting.
-  * Procedural Web Audio API sound synthesizer producing cryogenic pre-ignition venting, violent ignition detonation, thundering multi-oscillator rocket roar, Quindar tones, silent space vacuum acoustics, red alert sirens, and terrifying alien tentacle sounds.
+   - **Cliffhanger Ending**: Astronaut exits the habitat at sunset. In the distance, a rescue rover's headlights pierce the Martian horizon and approaches. Just as it reaches the astronaut, cut to black:
+     > **MISSION SUCCESSFUL**  
+     > **RESCUE VEHICLE ARRIVED.**  
+     > **BUT IS THIS REALLY THE END?**  
+     > **MARS: BEYOND SURVIVAL — CHAPTER 01 COMPLETE**
 
 ---
 

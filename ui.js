@@ -58,72 +58,6 @@ class UIManager {
       });
     }
 
-    const btnProloguePreview = document.getElementById('btn-prologue-preview');
-    if (btnProloguePreview) {
-      btnProloguePreview.addEventListener('click', () => {
-        if (window.soundSystem) window.soundSystem.playClick();
-        this.hideMainMenu();
-        if (window.gameEngine3D) {
-          window.gameEngine3D.startEarthLaunchPrologue(() => {
-            window.app.loadMission(1);
-          });
-        }
-      });
-    }
-
-    const btnCliffhangerPreview = document.getElementById('btn-cliffhanger-preview');
-    if (btnCliffhangerPreview) {
-      btnCliffhangerPreview.addEventListener('click', () => {
-        if (window.soundSystem) window.soundSystem.playClick();
-        this.hideMainMenu();
-        if (window.gameEngine3D) {
-          window.gameEngine3D.startSpaceshipEscapeCliffhanger();
-        }
-      });
-    }
-
-    const btnReplayCliffhanger = document.getElementById('btn-replay-cliffhanger');
-    if (btnReplayCliffhanger) {
-      btnReplayCliffhanger.addEventListener('click', () => {
-        if (window.soundSystem) window.soundSystem.playClick();
-        const blackout = document.getElementById('cliffhanger-blackout');
-        if (blackout) blackout.classList.remove('visible');
-        if (window.gameEngine3D) {
-          window.gameEngine3D.startSpaceshipEscapeCliffhanger();
-        }
-      });
-    }
-
-    const btnSkipCinematic = document.getElementById('btn-skip-cinematic');
-    if (btnSkipCinematic) {
-      btnSkipCinematic.addEventListener('click', () => {
-        if (window.soundSystem) window.soundSystem.playClick();
-        if (window.gameEngine3D) {
-          window.gameEngine3D.skipCinematic();
-        }
-      });
-    }
-
-    const btnCliffMainMenu = document.getElementById('btn-cliffhanger-mainmenu');
-    if (btnCliffMainMenu) {
-      btnCliffMainMenu.addEventListener('click', () => {
-        if (window.soundSystem) {
-          window.soundSystem.playClick();
-          window.soundSystem.stopRocketRoar(0.5);
-          window.soundSystem.stopEpicCliffhangerMusic();
-          if (window.soundSystem.stopEmergencyAlarm) window.soundSystem.stopEmergencyAlarm();
-        }
-        const blackout = document.getElementById('cliffhanger-blackout');
-        if (blackout) blackout.classList.remove('visible');
-        const overlay = document.getElementById('rocket-cliffhanger-overlay');
-        if (overlay) overlay.classList.add('hidden');
-        if (window.gameEngine3D) {
-          window.gameEngine3D.resetFromCliffhanger();
-        }
-        this.showMainMenu();
-      });
-    }
-
     const btnSettings = document.getElementById('btn-open-settings');
     if (btnSettings) {
       btnSettings.addEventListener('click', () => {
@@ -158,30 +92,6 @@ class UIManager {
         GAME_SETTINGS.volume = val;
         if (window.soundSystem) window.soundSystem.setVolume(val);
         window.gameState.saveSettings();
-      });
-    }
-
-    const sfxInput = document.getElementById('setting-sfx-vol');
-    if (sfxInput) {
-      sfxInput.addEventListener('input', (e) => {
-        const val = parseFloat(e.target.value) / 100;
-        if (window.soundSystem && window.soundSystem.setSFXVolume) window.soundSystem.setSFXVolume(val);
-      });
-    }
-
-    const ambInput = document.getElementById('setting-ambience-vol');
-    if (ambInput) {
-      ambInput.addEventListener('input', (e) => {
-        const val = parseFloat(e.target.value) / 100;
-        if (window.soundSystem && window.soundSystem.setAmbienceVolume) window.soundSystem.setAmbienceVolume(val);
-      });
-    }
-
-    const musicInput = document.getElementById('setting-music-vol');
-    if (musicInput) {
-      musicInput.addEventListener('input', (e) => {
-        const val = parseFloat(e.target.value) / 100;
-        if (window.soundSystem && window.soundSystem.setMusicVolume) window.soundSystem.setMusicVolume(val);
       });
     }
 
@@ -350,10 +260,25 @@ class UIManager {
     this.showBanner("💳 HABITAT ALPHA SECURITY KEYCARD ACQUIRED!");
     this.closeFlightRecorderModal();
 
-    // Update 3D interactable label
+    // Update 3D physical model & interactable state
+    if (window.gameEngine3D) {
+      if (window.gameEngine3D.flightRecorderLid) {
+        window.gameEngine3D.flightRecorderLid.rotation.x = -Math.PI / 2.5;
+      }
+      if (window.gameEngine3D.flightRecorderStrobeMat) {
+        window.gameEngine3D.flightRecorderStrobeMat.color.setHex(0x00ff88);
+      }
+      if (window.gameEngine3D.flightRecorderLight) {
+        window.gameEngine3D.flightRecorderLight.color.setHex(0x00ff88);
+      }
+      if (window.gameEngine3D.flightRecorderWaypoint) {
+        window.gameEngine3D.flightRecorderWaypoint.visible = false;
+      }
+    }
+
     const frItem = window.gameEngine3D?.interactables?.find(i => i.type === 'flight_recorder');
     if (frItem) {
-      frItem.label = "[Flight Recorder: Unlocked & Salvaged]";
+      frItem.label = "[Flight Recorder: Decrypted & Salvaged]";
       frItem.callback = () => {
         this.showBanner("Flight data recorder already opened and keycard salvaged.");
       };
@@ -541,7 +466,7 @@ class UIManager {
     if (curObj) {
       if (curObj.id === 'seal_suit') target = { x: -14, z: -8 };
       else if (curObj.id === 'find_supplies') target = { x: -15, z: -12 };
-      else if (curObj.id === 'find_keycard') target = { x: -19, z: -12 };
+      else if (curObj.id === 'find_keycard') target = { x: -13.5, z: -9.5 };
       else if (curObj.id === 'reach_hab') target = { x: 0, z: 12 };
       else if (curObj.id === 'find_solar_tools') target = { x: 12, z: 18 };
       else if (curObj.id === 'find_fuse') target = { x: 22, z: 34 };
@@ -721,6 +646,22 @@ class UIManager {
     const toMapX = (wx) => ((wx + 60) / 170) * w;
     const toMapY = (wz) => ((wz + 50) / 110) * h;
 
+    // Draw Operational Sector Geofence Perimeter
+    const bx1 = toMapX(-52);
+    const by1 = toMapY(-44);
+    const bx2 = toMapX(104);
+    const by2 = toMapY(56);
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 136, 0, 0.65)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.strokeRect(bx1, by1, bx2 - bx1, by2 - by1);
+    ctx.font = '9px Share Tech Mono, monospace';
+    ctx.fillStyle = 'rgba(255, 136, 0, 0.75)';
+    ctx.fillText("OPERATIONAL SECTOR GEOFENCE", bx1 + 6, by1 + 12);
+    ctx.restore();
+
     const locations = [
       { name: "CRASH SITE", x: -18, z: -12, color: "#ff4444" },
       { name: "HABITAT ALPHA", x: 0, z: 25, color: "#00e5ff" },
@@ -885,25 +826,159 @@ class UIManager {
   }
 
   playOpeningCinematic(onComplete) {
-    this.hideHUD();
     const overlay = document.getElementById('cinematic-overlay');
-    if (overlay) overlay.classList.add('hidden');
-
-    if (window.gameEngine3D) {
-      window.gameEngine3D.startEarthLaunchPrologue(onComplete);
-    } else {
+    const content = document.getElementById('cinematic-text-box');
+    const skipBtn = document.getElementById('btn-skip-cinematic');
+    if (!overlay || !content) {
       if (onComplete) onComplete();
+      return;
     }
+
+    window.gameState.inCutscene = true;
+    overlay.classList.remove('hidden');
+
+    const scenes = [
+      {
+        text: "ACIDALIA PLANITIA, MARS • SOL 412\n\nYou are stranded alone on the rust-red plains.",
+        duration: 3200
+      },
+      {
+        text: "INCOMING TRANSMISSION FROM EARTH...\n\n\"Commander Reyes, the Ares Rescue vehicle has launched successfully and is descending through the Martian atmosphere. Prepare for immediate extraction.\"",
+        duration: 4400,
+        sound: 'radio'
+      },
+      {
+        text: "RESCUE APPROACHING...\n\nThe rocket streaks through the Martian sky.\nRescue was so close.",
+        duration: 3400
+      },
+      {
+        text: "⚠️ CATASTROPHIC ENGINE MALFUNCTION\n\n\"Emergency! Main engine flameout! Trajectory unstable! We are losing attitude control! We're spinning out— BRACE FOR IMPACT!\"",
+        duration: 4200,
+        sound: 'alarm'
+      },
+      {
+        text: "💥 DISTANT IMPACT DETECTED — 2.1 KM NORTH-WEST\n\nA massive dust plume rocks the horizon.\nZero survivor telemetry returned.",
+        duration: 3800,
+        sound: 'crash'
+      },
+      {
+        text: "INCOMING TRANSMISSION FROM EARTH...\n\nRESCUE MISSION LOST. ROCKET SIGNAL TERMINATED.",
+        duration: 4000,
+        sound: 'static'
+      },
+      {
+        text: "YOU ARE STILL ALONE.\n\nFIND ANOTHER WAY HOME.",
+        duration: 4200
+      }
+    ];
+
+    let current = 0;
+    let timer = null;
+    let finished = false;
+
+    const cleanupAndFinish = () => {
+      if (finished) return;
+      finished = true;
+      if (timer) clearTimeout(timer);
+      overlay.classList.add('hidden');
+      window.gameState.inCutscene = false;
+      document.removeEventListener('keydown', onKeyDown);
+      overlay.removeEventListener('click', onOverlayClick);
+      if (skipBtn) skipBtn.onclick = null;
+      if (onComplete) onComplete();
+    };
+
+    const onKeyDown = (e) => {
+      if (e.code === 'Space' || e.code === 'Enter' || e.code === 'Escape') {
+        e.preventDefault();
+        cleanupAndFinish();
+      }
+    };
+
+    const onOverlayClick = (e) => {
+      if (e.target === skipBtn) return;
+      showNext();
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    overlay.addEventListener('click', onOverlayClick);
+
+    if (skipBtn) {
+      skipBtn.onclick = (e) => {
+        e.stopPropagation();
+        cleanupAndFinish();
+      };
+    }
+
+    const showNext = () => {
+      if (finished) return;
+      if (timer) clearTimeout(timer);
+      if (current >= scenes.length) {
+        cleanupAndFinish();
+        return;
+      }
+
+      const s = scenes[current];
+      content.innerHTML = `<p class="cinematic-text">${s.text.replace(/\n/g, '<br>')}</p>`;
+
+      if (window.soundSystem) {
+        if (s.sound === 'radio') window.soundSystem.playRadioBeep();
+        else if (s.sound === 'alarm') window.soundSystem.playRoverAlarm();
+        else if (s.sound === 'crash') window.soundSystem.playCrashImpact();
+        else if (s.sound === 'static') window.soundSystem.playFailure();
+      }
+
+      current++;
+      timer = setTimeout(showNext, s.duration);
+    };
+
+    showNext();
   }
 
   triggerEndingCinematic() {
-    this.hideHUD();
     const overlay = document.getElementById('cinematic-overlay');
-    if (overlay) overlay.classList.add('hidden');
+    const content = document.getElementById('cinematic-text-box');
+    if (!overlay || !content) return;
+
+    window.gameState.inCutscene = true;
+    overlay.classList.remove('hidden');
     if (window.soundSystem) window.soundSystem.setWindStorm(false);
-    if (window.gameEngine3D) {
-      window.gameEngine3D.startSpaceshipEscapeCliffhanger();
-    }
+
+    const scenes = [
+      { text: "SOL 7 • THE MARTIAN SUNSET\n\nYou step through the Habitat Alpha airlock into the rust-red twilight.", duration: 3800 },
+      { text: "In the distance, across the Martian horizon...\nTwo powerful headlights pierce the dusty haze.", duration: 4200 },
+      { text: "A heavy planetary rescue rover approaches through the dunes.\nIts engine rumbling grows louder.", duration: 4200 },
+      { text: "The rover slows to a halt mere meters in front of you.\n\nIts pressurized hatch begins to unlock...", duration: 4200 }
+    ];
+
+    let current = 0;
+    const showNext = () => {
+      if (current >= scenes.length) {
+        content.innerHTML = `
+          <div class="cliffhanger-box">
+            <h1 class="text-green font-orbitron">MISSION SUCCESSFUL</h1>
+            <h2 class="text-amber">RESCUE VEHICLE ARRIVED.</h2>
+            <br>
+            <h3 class="text-white">BUT IS THIS REALLY THE END?</h3>
+            <br>
+            <h2 class="text-cyan font-bold">MARS: BEYOND SURVIVAL — CHAPTER 01 COMPLETE</h2>
+            <br><br>
+            <button class="btn btn-primary btn-lg" onclick="location.reload()">RETURN TO MAIN MENU</button>
+          </div>
+        `;
+        if (window.soundSystem) window.soundSystem.playMissionSuccess();
+        return;
+      }
+
+      const s = scenes[current];
+      content.innerHTML = `<p class="cinematic-text">${s.text.replace(/\n/g, '<br>')}</p>`;
+      if (window.soundSystem && current === 2) window.soundSystem.updateRoverSound(8, false);
+
+      current++;
+      setTimeout(showNext, s.duration);
+    };
+
+    showNext();
   }
 }
 

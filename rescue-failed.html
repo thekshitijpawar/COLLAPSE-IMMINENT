@@ -12,8 +12,8 @@
     :root {
       --mars-red: #d94e28;
       --mars-dark: #120402;
-      --mars-sky-top: #1a0604;
-      --mars-sky-bottom: #943319;
+      --mars-sky-top: #000000;
+      --mars-sky-bottom: #080302;
       --hud-cyan: #00e5ff;
       --hud-amber: #ffaa00;
       --hud-red: #ff2a2a;
@@ -819,12 +819,12 @@
     function render() {
       ctx.clearRect(0, 0, w, h);
 
-      // 1. Martian Sky Gradient (Deep blackish-red to rusty amber horizon)
+      // 1. Solid Deep Black Martian Sky
       const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
-      skyGrad.addColorStop(0, '#0c0302');
-      skyGrad.addColorStop(0.45, '#2e0a05');
-      skyGrad.addColorStop(0.72, '#963419');
-      skyGrad.addColorStop(1, '#d94e28');
+      skyGrad.addColorStop(0, '#000000');
+      skyGrad.addColorStop(0.65, '#020102');
+      skyGrad.addColorStop(0.76, '#140503');
+      skyGrad.addColorStop(1, '#331008');
       ctx.fillStyle = skyGrad;
       ctx.fillRect(0, 0, w, h);
 

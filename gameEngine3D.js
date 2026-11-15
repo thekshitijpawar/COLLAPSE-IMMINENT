@@ -1,7 +1,6 @@
 /**
  * MARS: BEYOND SURVIVAL 🚀
  * gameEngine3D.js — 3D First-Person WebGL Engine, Martian World & Physics
- * Upgraded Visual Environment & Epic Rocket Launch Cliffhanger (Reference Images 1 & 2)
  */
 
 class GameEngine3D {
@@ -20,6 +19,7 @@ class GameEngine3D {
 
     // Movement & Controls
     this.keys = {};
+    this.onScreenSprintHeld = false;
     this.isPointerLocked = false;
     this.euler = null;
     this.playerHeight = 1.75;
@@ -30,72 +30,28 @@ class GameEngine3D {
     this.bobTimer = 0;
     this.reachTimer = 0;
 
+    // Playable Area & EVA Geofence Boundaries (Acidalia Planitia Sector)
+    this.playableBounds = {
+      minX: -52,
+      maxX: 104,
+      minZ: -44,
+      maxZ: 56
+    };
+    this.isOutOfBounds = false;
+    this.oobTimer = 10.0;
+    this.lastAlarmSoundTime = 0;
+
     // World & Environment
     this.terrain = null;
-    this.terrainSize = 360;
-    this.terrainSegments = 96;
+    this.terrainSize = 640;
+    this.terrainSegments = 80;
     this.sunLight = null;
     this.ambientLight = null;
-    this.hemiLight = null;
     this.dustParticles = null;
     this.interactables = [];
     this.colliders = [];
     this.raycaster = null;
     this.hoveredObject = null;
-
-    // Enhanced Sci-Fi Environment & Colony Objects (Reference Image 1)
-    this.skyDome = null;
-    this.cloudDome = null;
-    this.mountainRing = null;
-    this.colonyGroup = null;
-    this.astronautsGroup = null;
-    this.explorationRoverGroup = null;
-
-    // Massive SpaceX-Inspired Launch Complex & Spacecraft
-    this.rocketComplex = null;
-    this.rocketStack = null;
-    this.spacexStarship = null;
-    this.superHeavyBooster = null;
-    this.gridFins = [];
-    this.aerodynamicFlaps = [];
-    this.srbLeft = null;
-    this.srbRight = null;
-    this.engineFlames = [];
-    this.rocketPointLight = null;
-    this.cryoVaporParticles = null;
-    this.launchSmokeParticles = null;
-    this.smokeVelocities = null;
-
-    // Deep Space & Planetary Bodies (Earth & Mars)
-    this.spaceSceneGroup = null;
-    this.earthGroup = null;
-    this.earthMesh = null;
-    this.earthClouds = null;
-    this.marsGroup = null;
-    this.marsMesh = null;
-    this.starField = null;
-
-    // Giant Mysterious Alien Tentacle & Creature
-    this.tentacleGroup = null;
-    this.tentacleSegments = [];
-    this.cockpitRedAlertLight = null;
-
-    // Carbon Storage Boxes & Food Supplies
-    this.carbonBoxes = [];
-
-    // Cinematic Controllers (Opening Earth Launch Prologue & Final Tentacle Cliffhanger)
-    this.isPrologueActive = false;
-    this.prologueTime = 0;
-    this.prologuePhase = 0;
-    this.prologueCallback = null;
-
-    this.isEscapeActive = false;
-    this.escapeTime = 0;
-    this.escapePhase = 0;
-
-    this.isCliffhangerActive = false;
-    this.cliffhangerTime = 0;
-    this.cliffhangerPhase = 0;
 
     // Rover & Dynamic Objects
     this.rover = null;
@@ -113,7 +69,7 @@ class GameEngine3D {
 
     // Dust storm effects
     this.isStormActive = false;
-    this.stormParticleCount = 2800;
+    this.stormParticleCount = 2500;
 
     // Clock
     this.clock = null;
@@ -130,47 +86,69 @@ class GameEngine3D {
     const width = this.container.clientWidth || window.innerWidth;
     const height = this.container.clientHeight || window.innerHeight;
 
-    // 1. Scene & Camera
+    // 1. Scene & Camera (Deep Midnight Space Sky with NASA Atmospheric Depth)
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xd25b2a); // Rich Martian ochre
-    this.scene.fog = new THREE.FogExp2(0xc85b2e, 0.0095);
+    this.scene.background = new THREE.Color(0x020512); // Deep midnight navy-black space sky (NASA reference)
+    this.scene.fog = new THREE.FogExp2(0x070b18, 0.0055); // Subtle dark atmospheric horizon haze
 
-    this.camera = new THREE.PerspectiveCamera(72, width / height, 0.1, 1400);
+    // Deep Space Sky with Dense Stars, Diffraction Spikes, Galactic Band, Earth & Martian Moons
+    this.setupSpaceSky();
+
+    this.camera = new THREE.PerspectiveCamera(72, width / height, 0.1, 800);
     this.euler = new THREE.Euler(0, 0, 0, 'YXZ');
     this.position = new THREE.Vector3(0, this.playerHeight, 0);
     this.velocity = new THREE.Vector3(0, 0, 0);
 
-    // 2. Renderer
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    // 2. Renderer — performance-first, adaptive pixel ratio
+    // Detect device tier for smart defaults
+    const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    const dpr = window.devicePixelRatio || 1;
+    // Cap pixel ratio: mobile=1.0, desktop=1.5 (huge GPU savings, barely visible at distance)
+    this._targetDPR = isMobile ? Math.min(dpr, 1.0) : Math.min(dpr, 1.5);
+
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: !isMobile,          // Skip MSAA on mobile (saves ~30% GPU)
+      powerPreference: 'high-performance',
+      precision: 'mediump',          // mediump sufficient for game graphics, faster on mobile
+      logarithmicDepthBuffer: false  // Not needed here, disable for perf
+    });
     this.renderer.setSize(width, height);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(this._targetDPR);
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;   // Faster than PCFSoftShadowMap
+    this.renderer.shadowMap.autoUpdate = false;           // Manual shadow updates only
+    this.renderer.shadowMap.needsUpdate = true;           // Force first update
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.15;
+    this.renderer.toneMappingExposure = 1.05;
+    // Optimise draw call sorting
+    this.renderer.sortObjects = true;
     this.container.appendChild(this.renderer.domElement);
 
-    // 3. Cinematic Lighting (Warm Martian Sun + Rich Atmospheric Fill)
-    this.ambientLight = new THREE.AmbientLight(0xcc5528, 0.65);
+    // Adaptive quality: track FPS, drop DPR if struggling
+    this._fpsHistory = [];
+    this._lastFPSCheck = 0;
+    this._fpsCheckInterval = 3.0;   // Check every 3 seconds
+    this._adaptiveEnabled = true;
+
+    // 3. Lighting (Martian Sun + Atmosphere)
+    this.ambientLight = new THREE.AmbientLight(0xcc6633, 0.7);
     this.scene.add(this.ambientLight);
 
-    this.hemiLight = new THREE.HemisphereLight(0xff8844, 0x5a2010, 0.7);
-    this.scene.add(this.hemiLight);
-
-    // Low-angle dramatic Martian sun (creates long shadows matching Image 1)
-    this.sunLight = new THREE.DirectionalLight(0xffa258, 1.6);
-    this.sunLight.position.set(160, 95, -120);
+    this.sunLight = new THREE.DirectionalLight(0xffeedd, 1.4);
+    this.sunLight.position.set(120, 160, 90);
     this.sunLight.castShadow = true;
-    this.sunLight.shadow.mapSize.width = 2048;
-    this.sunLight.shadow.mapSize.height = 2048;
+    // Shadow map: 2048 on desktop for crisp shadows, 1024 on mobile
+    const shadowRes = isMobile ? 1024 : 2048;
+    this.sunLight.shadow.mapSize.width = shadowRes;
+    this.sunLight.shadow.mapSize.height = shadowRes;
     this.sunLight.shadow.camera.near = 10;
-    this.sunLight.shadow.camera.far = 480;
-    const d = 120;
+    this.sunLight.shadow.camera.far = 300;    // Reduced: shadows only within 300u not 400
+    this.sunLight.shadow.bias = -0.0003;      // Prevent shadow acne
+    const d = 80;                             // Tighter frustum = higher shadow texel density
     this.sunLight.shadow.camera.left = -d;
     this.sunLight.shadow.camera.right = d;
     this.sunLight.shadow.camera.top = d;
     this.sunLight.shadow.camera.bottom = -d;
-    this.sunLight.shadow.bias = -0.0004;
     this.scene.add(this.sunLight);
 
     // 4. Suit Flashlight attached to camera
@@ -185,38 +163,260 @@ class GameEngine3D {
     // 5. First-Person Astronaut Gloves / Viewmodel
     this.setupAstronautGloves();
 
-    // 6. Build Sky Dome & Distant Mountains (Reference Image 1)
-    this.buildMarsSkyAndAtmosphere();
-
-    // 7. Build Procedural Martian Dune Terrain & Rocks (Reference Image 1)
+    // 6. Build Martian Terrain & Geological Formations
     this.buildMartianTerrain();
 
-    // 8. Build Atmospheric Particle Field
+    // 7. Build Atmospheric Particle Field
     this.setupDustParticles();
 
-    // 9. Build Futuristic Mars Research Colony Complex (Reference Image 1)
-    this.buildColonyComplex();
-
-    // 10. Build Astronaut Explorers on EVA (Reference Image 1)
-    this.buildAstronautExplorers();
-
-    // 11. Build Massive Rocket Launch Complex & Stack (Reference Image 2 + Specs)
-    this.buildRocketLaunchComplex();
-
-    // 12. Build Orbital Earth & Starfield Climax Scene
-    this.buildSpaceAndEarthScene();
-
-    // 13. Raycaster for Interactions
+    // 8. Raycaster for Interactions
     this.raycaster = new THREE.Raycaster();
     this.raycaster.far = 4.2;
 
-    // 14. Input & Pointer Lock Setup
+    // 9. Input & Pointer Lock Setup
     this.setupControls();
 
     this.clock = new THREE.Clock();
     window.addEventListener('resize', () => this.onWindowResize());
 
     return true;
+  }
+
+  // ==========================================
+  // DEEP SPACE CELESTIAL SKY DOME (NASA ASTROPHOTOGRAPHY)
+  // ==========================================
+  createDiffractionSpikeTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    const cx = 64, cy = 64;
+
+    // Glowing core
+    const radGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 28);
+    radGrad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+    radGrad.addColorStop(0.25, 'rgba(215, 235, 255, 0.85)');
+    radGrad.addColorStop(0.6, 'rgba(120, 180, 255, 0.25)');
+    radGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = radGrad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 28, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 4-point sharp diffraction spikes (horizontal & vertical tapered rays)
+    const drawSpike = (angle, length, width, alpha) => {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angle);
+      const spikeGrad = ctx.createLinearGradient(0, -width, 0, width);
+      spikeGrad.addColorStop(0, `rgba(255, 255, 255, 0)`);
+      spikeGrad.addColorStop(0.5, `rgba(255, 255, 255, ${alpha})`);
+      spikeGrad.addColorStop(1, `rgba(255, 255, 255, 0)`);
+      ctx.fillStyle = spikeGrad;
+
+      ctx.beginPath();
+      ctx.moveTo(-length, 0);
+      ctx.lineTo(0, -width);
+      ctx.lineTo(length, 0);
+      ctx.lineTo(0, width);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    };
+
+    drawSpike(0, 60, 2.4, 0.95);           // Horizontal ray
+    drawSpike(Math.PI / 2, 60, 2.4, 0.95);  // Vertical ray
+    drawSpike(Math.PI / 4, 26, 1.2, 0.5);   // Diagonal subtle ray
+    drawSpike(-Math.PI / 4, 26, 1.2, 0.5);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    return tex;
+  }
+
+  setupSpaceSky() {
+    this.skyGroup = new THREE.Group();
+
+    // 1. Starfield: 4,500 dense background stars with spectral types
+    const starCount = 4500;
+    const starGeo = new THREE.BufferGeometry();
+    const starPos = new Float32Array(starCount * 3);
+    const starColors = new Float32Array(starCount * 3);
+
+    const spectralColors = [
+      new THREE.Color(0xb5d8ff), // O/B Brilliant Blue-White
+      new THREE.Color(0xf8faff), // A Pure Diamond White
+      new THREE.Color(0xfff6d8), // G Solar Warm White
+      new THREE.Color(0xffaf6a), // K Amber Orange
+      new THREE.Color(0xff6e50)  // M Red Giant
+    ];
+
+    for (let i = 0; i < starCount; i++) {
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(Math.random() * 2 - 1);
+      const r = 580 + Math.random() * 140;
+
+      const x = r * Math.sin(phi) * Math.cos(theta);
+      const y = Math.max(-20, r * Math.cos(phi));
+      const z = r * Math.sin(phi) * Math.sin(theta);
+
+      starPos[i * 3] = x;
+      starPos[i * 3 + 1] = y;
+      starPos[i * 3 + 2] = z;
+
+      const spec = spectralColors[Math.floor(Math.random() * spectralColors.length)];
+      const brightness = 0.5 + Math.random() * 0.5;
+      starColors[i * 3] = spec.r * brightness;
+      starColors[i * 3 + 1] = spec.g * brightness;
+      starColors[i * 3 + 2] = spec.b * brightness;
+    }
+
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+    starGeo.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+
+    // Notice: fog: false is CRITICAL so background stars never get extinguished by horizon fog!
+    const starMat = new THREE.PointsMaterial({
+      size: 2.2,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.96,
+      sizeAttenuation: false,
+      fog: false
+    });
+
+    const starsMesh = new THREE.Points(starGeo, starMat);
+    this.skyGroup.add(starsMesh);
+
+    // 2. 65 Prominent Bright Stars with 4-Point Cross Diffraction Spikes (User Reference Photo)
+    const spikeTex = this.createDiffractionSpikeTexture();
+    const brightStarPositions = [];
+
+    // Two huge standout primary stars (like the two bright ones in the user's reference photo)
+    brightStarPositions.push({ pos: new THREE.Vector3(-180, 420, -320), size: 42, color: 0xffffff });
+    brightStarPositions.push({ pos: new THREE.Vector3(-260, 280, -260), size: 36, color: 0xd8eeff });
+
+    // Additional prominent spiked stars forming authentic constellations
+    for (let b = 0; b < 60; b++) {
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.random() * (Math.PI * 0.42); // High in celestial dome
+      const r = 540;
+      const x = r * Math.sin(phi) * Math.cos(theta);
+      const y = Math.max(80, r * Math.cos(phi));
+      const z = r * Math.sin(phi) * Math.sin(theta);
+      const sz = 14 + Math.random() * 20;
+      const clr = Math.random() > 0.6 ? 0xffffff : Math.random() > 0.3 ? 0xcbe5ff : 0xffe2b8;
+      brightStarPositions.push({ pos: new THREE.Vector3(x, y, z), size: sz, color: clr });
+    }
+
+    brightStarPositions.forEach(b => {
+      const sMat = new THREE.SpriteMaterial({
+        map: spikeTex,
+        color: b.color,
+        transparent: true,
+        opacity: 0.95,
+        blending: THREE.AdditiveBlending,
+        fog: false
+      });
+      const sprite = new THREE.Sprite(sMat);
+      sprite.position.copy(b.pos);
+      sprite.scale.set(b.size, b.size, 1);
+      this.skyGroup.add(sprite);
+    });
+
+    // 3. Faint Milky Way Galactic Band & Star Dust Lane
+    const mwGeo = new THREE.BufferGeometry();
+    const mwCount = 1800;
+    const mwPos = new Float32Array(mwCount * 3);
+    const mwColors = new Float32Array(mwCount * 3);
+    const mwColor1 = new THREE.Color(0xa0bce8);
+    const mwColor2 = new THREE.Color(0xd2bba2);
+
+    for (let i = 0; i < mwCount; i++) {
+      const angle = (i / mwCount) * Math.PI * 2;
+      const spread = (Math.random() - 0.5) * 45;
+      const dist = 600 + (Math.random() - 0.5) * 40;
+      const gx = dist * Math.cos(angle);
+      const gy = dist * Math.sin(angle) * 0.78 + spread;
+      const gz = dist * Math.sin(angle) * 0.62 + (Math.random() - 0.5) * 55;
+
+      mwPos[i * 3] = gx;
+      mwPos[i * 3 + 1] = Math.max(20, gy);
+      mwPos[i * 3 + 2] = gz;
+
+      const c = Math.random() > 0.5 ? mwColor1 : mwColor2;
+      const a = 0.22 + Math.random() * 0.32;
+      mwColors[i * 3] = c.r * a;
+      mwColors[i * 3 + 1] = c.g * a;
+      mwColors[i * 3 + 2] = c.b * a;
+    }
+    mwGeo.setAttribute('position', new THREE.BufferAttribute(mwPos, 3));
+    mwGeo.setAttribute('color', new THREE.BufferAttribute(mwColors, 3));
+    const mwMat = new THREE.PointsMaterial({
+      size: 3.5,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.5,
+      sizeAttenuation: false,
+      fog: false
+    });
+    this.skyGroup.add(new THREE.Points(mwGeo, mwMat));
+
+    // 4. Earth: The "Pale Blue Dot" with Atmospheric Sapphire Halo
+    const earthGroup = new THREE.Group();
+    earthGroup.position.set(240, 360, -320);
+
+    const earthDotGeo = new THREE.SphereGeometry(1.8, 16, 16);
+    const earthDotMat = new THREE.MeshBasicMaterial({ color: 0x58ccff, fog: false });
+    earthGroup.add(new THREE.Mesh(earthDotGeo, earthDotMat));
+
+    const earthHaloGeo = new THREE.SphereGeometry(2.8, 16, 16);
+    const earthHaloMat = new THREE.MeshBasicMaterial({
+      color: 0x0288d1,
+      transparent: true,
+      opacity: 0.45,
+      fog: false
+    });
+    earthGroup.add(new THREE.Mesh(earthHaloGeo, earthHaloMat));
+    this.skyGroup.add(earthGroup);
+
+    // 5. Martian Moon: Phobos (Irregular potato-shaped cratered moon)
+    const phobosGroup = new THREE.Group();
+    phobosGroup.position.set(-280, 290, 180);
+    const phobosGeo = new THREE.DodecahedronGeometry(5.8, 1);
+    const phobosPos = phobosGeo.attributes.position;
+    for (let i = 0; i < phobosPos.count; i++) {
+      const vx = phobosPos.getX(i);
+      const vy = phobosPos.getY(i);
+      const vz = phobosPos.getZ(i);
+      const noise = 1 + (Math.sin(vx * 2.0) * Math.cos(vy * 2.0)) * 0.18;
+      phobosPos.setXYZ(i, vx * noise, vy * 0.85 * noise, vz * noise);
+    }
+    phobosGeo.computeVertexNormals();
+
+    const phobosMat = new THREE.MeshStandardMaterial({
+      color: 0x8a7f76,
+      roughness: 0.95,
+      metalness: 0.1,
+      flatShading: true,
+      fog: false
+    });
+    phobosGroup.add(new THREE.Mesh(phobosGeo, phobosMat));
+    this.skyGroup.add(phobosGroup);
+
+    // 6. Martian Moon: Deimos (Smaller, distant smooth moon)
+    const deimosGroup = new THREE.Group();
+    deimosGroup.position.set(380, 220, 260);
+    const deimosGeo = new THREE.DodecahedronGeometry(2.6, 1);
+    const deimosMat = new THREE.MeshStandardMaterial({
+      color: 0x9a8f88,
+      roughness: 0.9,
+      metalness: 0.05,
+      flatShading: true,
+      fog: false
+    });
+    deimosGroup.add(new THREE.Mesh(deimosGeo, deimosMat));
+    this.skyGroup.add(deimosGroup);
+
+    this.scene.add(this.skyGroup);
   }
 
   // ==========================================
@@ -341,162 +541,41 @@ class GameEngine3D {
   }
 
   // ==========================================
-  // PROCEDURAL MARTIAN SKY, CLOUDS & MOUNTAINS (Reference Image 1)
-  // ==========================================
-  buildMarsSkyAndAtmosphere() {
-    // 1. Inverted Sky Dome with Atmospheric Gradient
-    const skyGeo = new THREE.SphereGeometry(680, 32, 24);
-    skyGeo.scale(-1, 1, 1);
-
-    const skyCanvas = document.createElement('canvas');
-    skyCanvas.width = 512;
-    skyCanvas.height = 512;
-    const ctx = skyCanvas.getContext('2d');
-
-    // Photorealistic Martian atmospheric scattering gradient
-    const grad = ctx.createLinearGradient(0, 0, 0, 512);
-    grad.addColorStop(0.0, '#4a1e12'); // Deep muted dusty brown at zenith
-    grad.addColorStop(0.30, '#7d381c'); // Natural iron oxide ochre
-    grad.addColorStop(0.60, '#a8572c'); // Warm atmospheric butterscotch
-    grad.addColorStop(0.82, '#ca7946'); // Dusty salmon horizon haze
-    grad.addColorStop(0.94, '#db8f5c'); // Warm suspended regolith dust scattering
-    grad.addColorStop(1.0, '#bd6a39'); // Horizon dust attenuation
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 512, 512);
-
-    // Subtle atmospheric dust haze bands with gentle Mie scattering
-    for (let i = 0; i < 9; i++) {
-      const y = 220 + i * 28;
-      ctx.fillStyle = `rgba(240, 185, 145, ${0.03 + Math.random() * 0.04})`;
-      ctx.fillRect(0, y, 512, 14 + Math.random() * 12);
-    }
-
-    const skyTexture = new THREE.CanvasTexture(skyCanvas);
-    const skyMat = new THREE.MeshBasicMaterial({
-      map: skyTexture,
-      depthWrite: false
-    });
-    this.skyDome = new THREE.Mesh(skyGeo, skyMat);
-    this.skyDome.renderOrder = -100;
-    this.scene.add(this.skyDome);
-
-    // 2. High-Altitude Cirrus Ice-Dust Cloud Dome (Image 1)
-    const cloudGeo = new THREE.SphereGeometry(660, 32, 18);
-    cloudGeo.scale(-1, 1, 1);
-
-    const cloudCanvas = document.createElement('canvas');
-    cloudCanvas.width = 512;
-    cloudCanvas.height = 512;
-    const cCtx = cloudCanvas.getContext('2d');
-    cCtx.clearRect(0, 0, 512, 512);
-
-    // Soft wispy horizontal cloud streaks
-    for (let c = 0; c < 14; c++) {
-      const cy = 120 + c * 22;
-      const cAlpha = 0.08 + Math.sin(c * 0.45) * 0.07;
-      cCtx.fillStyle = `rgba(255, 235, 220, ${cAlpha})`;
-      cCtx.beginPath();
-      cCtx.moveTo(0, cy);
-      for (let x = 0; x <= 512; x += 32) {
-        const offset = Math.sin((x / 512) * Math.PI * 4 + c) * 6;
-        cCtx.lineTo(x, cy + offset);
-      }
-      cCtx.lineTo(512, cy + 12);
-      cCtx.lineTo(0, cy + 12);
-      cCtx.closePath();
-      cCtx.fill();
-    }
-
-    const cloudTexture = new THREE.CanvasTexture(cloudCanvas);
-    cloudTexture.wrapS = THREE.RepeatWrapping;
-    cloudTexture.wrapT = THREE.ClampToEdgeWrapping;
-    const cloudMat = new THREE.MeshBasicMaterial({
-      map: cloudTexture,
-      transparent: true,
-      opacity: 0.55,
-      depthWrite: false
-    });
-    this.cloudDome = new THREE.Mesh(cloudGeo, cloudMat);
-    this.cloudDome.renderOrder = -95;
-    this.scene.add(this.cloudDome);
-
-    // 3. Ring of Distant Martian Mountains & Crater Rims (Image 1)
-    this.buildDistantMountains();
-  }
-
-  buildDistantMountains() {
-    this.mountainRing = new THREE.Group();
-    const mountainMat = new THREE.MeshStandardMaterial({
-      color: 0x822f18, // Basalt iron-oxide red rock
-      roughness: 0.95,
-      metalness: 0.05,
-      flatShading: true
-    });
-
-    const numPeaks = 48;
-    const radius = 380;
-    for (let i = 0; i < numPeaks; i++) {
-      const angle = (i / numPeaks) * Math.PI * 2;
-      const r = radius + (Math.sin(i * 3.7) * 45);
-      const x = Math.sin(angle) * r;
-      const z = Math.cos(angle) * r;
-
-      const peakHeight = 35 + Math.abs(Math.sin(i * 1.8 + Math.cos(i * 2.5))) * 50;
-      const peakWidth = 35 + (i % 5) * 12;
-
-      const geo = new THREE.ConeGeometry(peakWidth * 0.5, peakHeight, 5 + (i % 3));
-      const pos = geo.attributes.position;
-      for (let p = 0; p < pos.count; p++) {
-        if (pos.getY(p) > 0) {
-          pos.setX(p, pos.getX(p) + (Math.random() - 0.5) * 4);
-          pos.setZ(p, pos.getZ(p) + (Math.random() - 0.5) * 4);
-        }
-      }
-      geo.computeVertexNormals();
-
-      const peak = new THREE.Mesh(geo, mountainMat);
-      peak.position.set(x, peakHeight * 0.45 - 6, z);
-      peak.rotation.y = Math.random() * Math.PI;
-      this.mountainRing.add(peak);
-    }
-
-    this.scene.add(this.mountainRing);
-  }
-
-  // ==========================================
-  // PROCEDURAL MARTIAN TERRAIN & GEOLOGY (Image 1)
+  // PROCEDURAL MARTIAN TERRAIN & GEOLOGY
   // ==========================================
   computeTerrainHeight(x, z) {
-    // 1. Natural sweeping sand dunes & wind ridges (Image 1)
-    let h = Math.sin(x * 0.024 + Math.cos(z * 0.02) * 1.6) * 3.2;
-    h += Math.sin(z * 0.038 - x * 0.018) * 1.8;
-    h += Math.sin((x * 0.8 + z * 0.5) * 0.12) * 0.25;
+    // Continuous mathematical terrain height formula
+    let h = Math.sin(x * 0.035) * 1.5 + Math.cos(z * 0.028) * 1.8;
+    h += Math.sin((x + z) * 0.06) * 0.8;
 
-    // 2. Crash crater at x=-15, z=-10
+    // Crash crater at x=-15, z=-10
     const distCrash = Math.hypot(x + 15, z + 10);
     if (distCrash < 30) {
       const rim = Math.sin((distCrash / 30) * Math.PI) * 2.2;
       h += rim - (30 - distCrash) * 0.12;
     }
 
-    // 3. Crater Ridge in Level 5 area (x > 50)
+    // Crater Ridge in Level 5 area (x > 50)
     if (x > 50) {
       const ridgeFactor = Math.min(1, (x - 50) / 40);
       h += Math.sin(z * 0.05) * 4.0 * ridgeFactor + ridgeFactor * 14.0;
     }
 
-    // 4. Flat foundation for Habitat Alpha & Colony Complex at x=0, z=25
+    // Flat foundation for Habitat Alpha at x=0, z=25
     const distHab = Math.hypot(x, z - 25);
-    if (distHab < 28) {
-      const factor = distHab / 28;
+    if (distHab < 22) {
+      const factor = distHab / 22;
       h = h * factor + 0 * (1 - factor);
     }
 
-    // 5. Flat foundation for Rocket Launch Complex at x=-85, z=-85
-    const distPad = Math.hypot(x + 85, z + 85);
-    if (distPad < 36) {
-      const factor = distPad / 36;
-      h = h * factor + 0.5 * (1 - factor);
+    // Continuous undulating regional Martian terrain (seamless landscape as character moves forward)
+    h += Math.sin(x * 0.012 + z * 0.015) * 3.8 + Math.cos(x * 0.016 - z * 0.014) * 3.2;
+
+    // Distant perimeter mountain rims far out on the horizon (beyond 250m)
+    const distCenter = Math.hypot(x, z);
+    if (distCenter > 250) {
+      const rimFactor = (distCenter - 250) / 60;
+      h += Math.sin(distCenter * 0.04) * 8.0 * rimFactor + rimFactor * 24.0;
     }
 
     return h;
@@ -517,121 +596,521 @@ class GameEngine3D {
 
     geo.computeVertexNormals();
 
-    // 1024x1024 High-Resolution Martian Sand Texture (Image 1)
+    // 1. Photorealistic Martian Regolith — Fast procedural texture (512×512, GPU-tiled 48×)
+    // Uses only arithmetic (no nested loops/Voronoi) — generates in <10ms on any device
+    const TEX = 512;
     const canvas = document.createElement('canvas');
-    canvas.width = 1024;
-    canvas.height = 1024;
+    canvas.width = TEX; canvas.height = TEX;
     const ctx = canvas.getContext('2d');
+    const imgData = ctx.createImageData(TEX, TEX);
+    const data = imgData.data;
 
-    // Base terracotta desert wash
-    ctx.fillStyle = '#b74922';
-    ctx.fillRect(0, 0, 1024, 1024);
+    const bumpCanvas = document.createElement('canvas');
+    bumpCanvas.width = TEX; bumpCanvas.height = TEX;
+    const bctx = bumpCanvas.getContext('2d');
+    const bImgData = bctx.createImageData(TEX, TEX);
+    const bData = bImgData.data;
 
-    // Fine parallel windblown sand ripples (Image 1)
-    for (let r = 0; r < 1024; r += 14) {
-      const rippleShade = Math.sin(r * 0.08) > 0 ? 'rgba(215, 105, 50, 0.35)' : 'rgba(135, 48, 18, 0.4)';
-      ctx.fillStyle = rippleShade;
-      ctx.fillRect(0, r, 1024, 8);
+    // Fast hash — integer lattice, no Math.sin
+    const P = new Uint8Array(512);
+    for (let i = 0; i < 256; i++) P[i] = P[i + 256] = i;
+    for (let i = 255; i > 0; i--) {
+      const j = Math.random() * (i + 1) | 0;
+      [P[i], P[j]] = [P[j], P[i]];
+      P[i + 256] = P[i]; P[j + 256] = P[j];
+    }
+    function fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+    function lerp(a, b, t) { return a + t * (b - a); }
+    function grad(h, x, y) {
+      h &= 3;
+      return (h < 2 ? (h === 0 ? x : -x) : 0) + (h < 2 ? 0 : (h === 1 ? y : -y));
+    }
+    function perlin(x, y) {
+      const xi = Math.floor(x) & 255, yi = Math.floor(y) & 255;
+      const xf = x - Math.floor(x), yf = y - Math.floor(y);
+      const u = fade(xf), v = fade(yf);
+      const aa = P[P[xi] + yi], ab = P[P[xi] + yi + 1];
+      const ba = P[P[xi + 1] + yi], bb = P[P[xi + 1] + yi + 1];
+      return lerp(
+        lerp(grad(aa, xf, yf),     grad(ba, xf - 1, yf),     u),
+        lerp(grad(ab, xf, yf - 1), grad(bb, xf - 1, yf - 1), u),
+        v
+      );
+    }
+    function fbm2(x, y) {   // 3-octave fBm — fast enough at 512×512
+      return perlin(x, y) * 0.5 + perlin(x * 2.1, y * 2.1) * 0.25 + perlin(x * 4.3, y * 4.3) * 0.125;
     }
 
-    // Scattered dark basalt mineral speckles & iron-oxide dust granules
-    for (let p = 0; p < 22000; p++) {
-      const px = Math.random() * 1024;
-      const py = Math.random() * 1024;
-      const radius = Math.random() * 2.2 + 0.4;
-      const isDark = Math.random() > 0.45;
-      ctx.fillStyle = isDark ? 'rgba(92, 32, 12, 0.45)' : 'rgba(235, 130, 68, 0.5)';
-      ctx.beginPath();
-      ctx.arc(px, py, radius, 0, Math.PI * 2);
-      ctx.fill();
+    const INV = 1 / TEX;
+    for (let y = 0; y < TEX; y++) {
+      const ny = y * INV;
+      for (let x = 0; x < TEX; x++) {
+        const nx = x * INV;
+        const idx = (y * TEX + x) * 4;
+
+        // --- Large-scale color zone (3-octave fBm, fast) ---
+        const zone = fbm2(nx * 3.0, ny * 3.0) * 0.5 + 0.5;   // 0..1
+
+        // NASA ochre palette blend
+        const zA = Math.max(0, 1 - Math.abs(zone - 0.35) * 5);  // dark basalt
+        const zC = Math.max(0, (zone - 0.65) * 3.5);            // bright dust
+        // Base ochre rgb(195,122,68) blended with basalt rgb(118,62,36) & dust rgb(215,160,100)
+        let baseR = 195 + zA * (118 - 195) + zC * (215 - 195);
+        let baseG = 122 + zA * (62  - 122) + zC * (160 - 122);
+        let baseB = 68  + zA * (36  - 68)  + zC * (100 - 68);
+
+        // --- Aeolian ripples (wind angle 35°, cheap sin) ---
+        const wa = nx * 0.82 + ny * 0.57;
+        const ripple = Math.sin(wa * 40.0) * 0.5 + 0.5;
+
+        // --- Crack network — cheap approximation via fBm derivative ---
+        const crack = Math.abs(perlin(nx * 14, ny * 14)) * 2.0;
+        const crackMask = Math.min(1, crack * 2.5);             // bright = safe, 0 = crack
+
+        // --- Fine grain (integer hash, 1 op per pixel) ---
+        const gi = (x * 1664525 + y * 1013904223) & 0xFFFFFF;
+        const grain = (gi & 0xFF) / 255;
+
+        // Compose
+        baseR += ripple * 22 + (grain - 0.5) * 16;
+        baseG += ripple * 15 + (grain - 0.5) * 10;
+        baseB += ripple * 7  + (grain - 0.5) * 5;
+
+        // Crack darkening
+        const cm = 0.72 + crackMask * 0.28;
+        baseR *= cm; baseG *= cm; baseB *= cm;
+
+        // Hematite concretion spots (integer grid, one hash)
+        const sx = x >> 2, sy = y >> 2;         // 4px cell = 128×128 dots
+        const sh = (sx * 1664525 + sy * 1013904223) & 0xFFFFFF;
+        if ((sh % 1000) < 22) { baseR = 50; baseG = 18; baseB = 8; }         // dark iron-oxide
+        else if ((sh % 1000) > 978) { baseR = 225; baseG = 172; baseB = 108; } // bright calcium
+
+        data[idx]     = Math.min(255, Math.max(0, baseR + 0.5) | 0);
+        data[idx + 1] = Math.min(255, Math.max(0, baseG + 0.5) | 0);
+        data[idx + 2] = Math.min(255, Math.max(0, baseB + 0.5) | 0);
+        data[idx + 3] = 255;
+
+        const bVal = (ripple * 0.5 + (1 - crackMask) * 0.3 + grain * 0.2) * 255 | 0;
+        bData[idx] = bVal; bData[idx+1] = bVal; bData[idx+2] = bVal; bData[idx+3] = 255;
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    bctx.putImageData(bImgData, 0, 0);
+
+    // Quick canvas scatter for mineral nodules (1500 dots, cheap)
+    for (let p = 0; p < 1500; p++) {
+      const px = Math.random() * TEX, py = Math.random() * TEX;
+      const pr = Math.random() * 1.5 + 0.4;
+      const roll = Math.random();
+      ctx.fillStyle = roll < 0.6 ? 'rgba(50,16,8,0.68)' : 'rgba(218,162,92,0.5)';
+      ctx.beginPath(); ctx.arc(px, py, pr, 0, 6.283); ctx.fill();
     }
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(22, 22);
+    texture.repeat.set(48, 48);
+    texture.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
 
-    // Bump map for micro sand-grain tactile relief reacting to sunlight
-    const bumpCanvas = document.createElement('canvas');
-    bumpCanvas.width = 512;
-    bumpCanvas.height = 512;
-    const bCtx = bumpCanvas.getContext('2d');
-    bCtx.fillStyle = '#808080';
-    bCtx.fillRect(0, 0, 512, 512);
-    for (let bp = 0; bp < 12000; bp++) {
-      const bx = Math.random() * 512;
-      const by = Math.random() * 512;
-      const br = Math.random() * 2.0 + 0.5;
-      bCtx.fillStyle = Math.random() > 0.5 ? '#a0a0a0' : '#606060';
-      bCtx.beginPath();
-      bCtx.arc(bx, by, br, 0, Math.PI * 2);
-      bCtx.fill();
-    }
     const bumpTexture = new THREE.CanvasTexture(bumpCanvas);
     bumpTexture.wrapS = THREE.RepeatWrapping;
     bumpTexture.wrapT = THREE.RepeatWrapping;
-    bumpTexture.repeat.set(22, 22);
+    bumpTexture.repeat.set(48, 48);
 
     const terrainMat = new THREE.MeshStandardMaterial({
       map: texture,
       bumpMap: bumpTexture,
-      bumpScale: 0.05,
-      roughness: 0.94,
-      metalness: 0.06
+      bumpScale: 0.22,
+      roughness: 0.92,
+      metalness: 0.04,
+      flatShading: false
     });
 
     this.terrain = new THREE.Mesh(geo, terrainMat);
     this.terrain.receiveShadow = true;
     this.scene.add(this.terrain);
 
-    // Scatter authentic rocks and flat shale slabs matching Image 1
     this.scatterMartianRocks();
+    this.buildPerimeterMarkers();
+  }
+
+  buildPerimeterMarkers() {
+    const group = new THREE.Group();
+    const postGeo = new THREE.CylinderGeometry(0.06, 0.08, 1.8, 8);
+    const postMat = new THREE.MeshStandardMaterial({ color: 0x2b2e34, metalness: 0.8, roughness: 0.3 });
+    const stripeGeo = new THREE.CylinderGeometry(0.065, 0.075, 0.4, 8);
+    const stripeMat = new THREE.MeshStandardMaterial({ color: 0xf5a623, roughness: 0.4 });
+    const strobeGeo = new THREE.SphereGeometry(0.09, 8, 8);
+    this.perimeterStrobeMat = new THREE.MeshBasicMaterial({ color: 0xff5500 });
+
+    const b = this.playableBounds;
+    const points = [];
+
+    // North & South edges
+    for (let x = b.minX; x <= b.maxX; x += 18) {
+      points.push({ x: x, z: b.minZ });
+      points.push({ x: x, z: b.maxZ });
+    }
+    // West & East edges
+    for (let z = b.minZ + 18; z < b.maxZ; z += 18) {
+      points.push({ x: b.minX, z: z });
+      points.push({ x: b.maxX, z: z });
+    }
+
+    points.forEach(pt => {
+      const pGroup = new THREE.Group();
+      const y = this.getTerrainHeight(pt.x, pt.z);
+      pGroup.position.set(pt.x, y, pt.z);
+
+      const post = new THREE.Mesh(postGeo, postMat);
+      post.position.y = 0.9;
+      pGroup.add(post);
+
+      const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+      stripe.position.y = 1.1;
+      pGroup.add(stripe);
+
+      const strobe = new THREE.Mesh(strobeGeo, this.perimeterStrobeMat);
+      strobe.position.y = 1.85;
+      pGroup.add(strobe);
+
+      group.add(pGroup);
+    });
+
+    this.scene.add(group);
+  }
+
+  handleBoundaryEncounter(direction) {
+    const now = performance.now();
+    if (!this.lastBoundaryWarnTime || now - this.lastBoundaryWarnTime > 3500) {
+      this.lastBoundaryWarnTime = now;
+      if (window.soundSystem) window.soundSystem.playRadioBeep();
+      if (window.uiManager) {
+        window.uiManager.showBanner(`⚠️ EVA GEOFENCE: Mission sector perimeter reached (${direction}). Turn back to operational zone.`, 3000);
+      }
+    }
   }
 
   getTerrainHeight(x, z) {
     return this.computeTerrainHeight(x, z);
   }
 
-  scatterMartianRocks() {
-    const rockMat = new THREE.MeshStandardMaterial({
-      color: 0x6e2a16, // Dark weathered basalt
-      roughness: 0.96,
-      metalness: 0.08
-    });
-    const slabMat = new THREE.MeshStandardMaterial({
-      color: 0x7c341c, // Layered sedimentary Martian shale
-      roughness: 0.92,
-      metalness: 0.05
-    });
+  createMartianRockTextures() {
+    // 1. Sedimentary Weathered Sandstone Diffuse Texture (1024x1024 - NASA Gale/Jezero Crater Mudstone)
+    const diffCanvas = document.createElement('canvas');
+    diffCanvas.width = 1024;
+    diffCanvas.height = 1024;
+    const ctx = diffCanvas.getContext('2d');
+    const imgData = ctx.createImageData(1024, 1024);
+    const data = imgData.data;
 
-    // 1. Scattered Boulders & Craggy Rocks (Image 1)
-    for (let i = 0; i < 75; i++) {
-      const x = (Math.random() - 0.5) * 260;
-      const z = (Math.random() - 0.5) * 260;
+    // 2. High-Relief Tactile Bump Map (1024x1024)
+    const bumpCanvas = document.createElement('canvas');
+    bumpCanvas.width = 1024;
+    bumpCanvas.height = 1024;
+    const bctx = bumpCanvas.getContext('2d');
+    const bImgData = bctx.createImageData(1024, 1024);
+    const bData = bImgData.data;
 
-      // Keep clear of habitat center, launch complex, and crash site
-      if (Math.hypot(x, z - 25) < 16) continue;
-      if (Math.hypot(x + 85, z + 85) < 32) continue;
-      if (Math.hypot(x + 15, z + 10) < 14) continue;
+    // 3. Specular Roughness Map (512x512)
+    const roughCanvas = document.createElement('canvas');
+    roughCanvas.width = 512;
+    roughCanvas.height = 512;
+    const rctx = roughCanvas.getContext('2d');
+    const rImgData = rctx.createImageData(512, 512);
+    const rData = rImgData.data;
 
-      const scale = 0.5 + Math.random() * 2.4;
-      const geo = new THREE.DodecahedronGeometry(scale, 1);
+    for (let y = 0; y < 1024; y++) {
+      const ny = y / 1024;
+      for (let x = 0; x < 1024; x++) {
+        const nx = x / 1024;
+        const idx = (y * 1024 + x) * 4;
 
-      const pos = geo.attributes.position;
-      for (let p = 0; p < pos.count; p++) {
-        pos.setX(p, pos.getX(p) * (0.8 + Math.random() * 0.4));
-        pos.setY(p, pos.getY(p) * (0.7 + Math.random() * 0.4));
-        pos.setZ(p, pos.getZ(p) * (0.8 + Math.random() * 0.4));
+        // Low-frequency organic domain warping for gentle geological variation (NO harsh stripes!)
+        const warp1 = Math.sin(nx * 3.2 + ny * 2.8) * 0.08;
+        const warp2 = Math.cos(nx * 2.6 - ny * 3.4) * 0.08;
+        const wx = nx + warp1;
+        const wy = ny + warp2;
+
+        // Very broad, gentle sedimentary bed tone (smooth large-scale grading)
+        const strataGrad = Math.sin(wy * 4.2 + wx * 1.6) * 0.07;
+
+        // Multi-scale desert varnish (dark iron-manganese wind polish from NASA rover photos)
+        const varnish1 = Math.sin(wx * 4.8) * Math.cos(wy * 5.2) * 0.5 + 0.5;
+        const varnish2 = Math.sin(wx * 9.5 + wy * 8.2) * 0.5 + 0.5;
+        const varnish = varnish1 * 0.7 + varnish2 * 0.3;
+
+        // Soft airfall dust settling in shallow depressions
+        const dust = Math.cos(wx * 6.0 - wy * 5.0) * 0.5 + 0.5;
+
+        // Fine tactile sandstone grain (micro-grit without banding)
+        const g1 = ((Math.sin(x * 12.9898 + y * 78.233) * 43758.5453) % 1 + 1) * 0.5;
+        const g2 = ((Math.sin(x * 63.7264 + y * 10.873) * 12345.6789) % 1 + 1) * 0.5;
+        const grain = g1 * 0.65 + g2 * 0.35;
+
+        // Authentically calibrated NASA Mars rover mudstone palette (tawny ochre base with varnish & dust)
+        const blend = 0.5 + strataGrad + (varnish - 0.5) * 0.28 + (dust - 0.5) * 0.22 + (grain - 0.5) * 0.16;
+
+        const r = Math.min(255, Math.max(0, Math.floor(178 + (blend - 0.5) * 78)));
+        const g = Math.min(255, Math.max(0, Math.floor(102 + (blend - 0.5) * 64)));
+        const b = Math.min(255, Math.max(0, Math.floor(64 + (blend - 0.5) * 44)));
+
+        data[idx] = r;
+        data[idx + 1] = g;
+        data[idx + 2] = b;
+        data[idx + 3] = 255;
+
+        // Bump height: natural micro-pitting, aeolian vents, and tactile stone relief
+        const bumpVal = Math.floor((strataGrad * 0.15 + (1 - varnish) * 0.25 + grain * 0.6) * 255);
+        bData[idx] = bumpVal;
+        bData[idx + 1] = bumpVal;
+        bData[idx + 2] = bumpVal;
+        bData[idx + 3] = 255;
       }
-      geo.computeVertexNormals();
+    }
 
-      const rock = new THREE.Mesh(geo, rockMat);
-      const y = this.getTerrainHeight(x, z) + scale * 0.35;
-      rock.position.set(x, y, z);
-      rock.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-      rock.castShadow = true;
-      rock.receiveShadow = true;
-      this.scene.add(rock);
+    ctx.putImageData(imgData, 0, 0);
+    bctx.putImageData(bImgData, 0, 0);
+
+    // Pale calcium sulfate (gypsum) mineral veins (famous NASA Curiosity discovery in Gale Crater)
+    ctx.strokeStyle = 'rgba(235, 225, 210, 0.45)';
+    ctx.lineWidth = 1.4;
+    for (let v = 0; v < 7; v++) {
+      let vx = Math.random() * 1024;
+      let vy = Math.random() * 1024;
+      const vAngle = Math.random() * Math.PI * 2;
+      const vLen = 60 + Math.random() * 100;
+      ctx.beginPath();
+      ctx.moveTo(vx, vy);
+      for (let s = 0; s < vLen; s += 10) {
+        vx += Math.cos(vAngle) * 10 + (Math.random() - 0.5) * 5;
+        vy += Math.sin(vAngle) * 10 + (Math.random() - 0.5) * 5;
+        ctx.lineTo(vx, vy);
+      }
+      ctx.stroke();
+    }
+
+    // Subtle natural weathering fractures
+    ctx.strokeStyle = 'rgba(48, 22, 12, 0.6)';
+    ctx.lineWidth = 1.5;
+    bctx.strokeStyle = 'rgb(25, 25, 25)';
+    bctx.lineWidth = 2.0;
+
+    for (let c = 0; c < 12; c++) {
+      let cx = Math.random() * 1024;
+      let cy = Math.random() * 1024;
+      const angle = (Math.random() - 0.5) * Math.PI * 0.8;
+      const len = 50 + Math.random() * 90;
+
+      ctx.beginPath();
+      bctx.beginPath();
+      ctx.moveTo(cx, cy);
+      bctx.moveTo(cx, cy);
+
+      for (let s = 0; s < len; s += 12) {
+        cx += Math.cos(angle) * 12 + (Math.random() - 0.5) * 5;
+        cy += Math.sin(angle) * 12 + (Math.random() - 0.5) * 5;
+        ctx.lineTo(cx, cy);
+        bctx.lineTo(cx, cy);
+      }
+      ctx.stroke();
+      bctx.stroke();
+    }
+
+    // Roughness map (512x512)
+    for (let ry = 0; ry < 512; ry++) {
+      for (let rx = 0; rx < 512; rx++) {
+        const ridx = (ry * 512 + rx) * 4;
+        const rGrit = ((Math.sin(rx * 12.9898 + ry * 78.233) * 43758.5453) % 1 + 1) * 0.5;
+        const rVal = Math.floor(190 + rGrit * 50);
+        rData[ridx] = rVal;
+        rData[ridx + 1] = rVal;
+        rData[ridx + 2] = rVal;
+        rData[ridx + 3] = 255;
+      }
+    }
+    rctx.putImageData(rImgData, 0, 0);
+
+    const diffTex = new THREE.CanvasTexture(diffCanvas);
+    diffTex.wrapS = THREE.RepeatWrapping;
+    diffTex.wrapT = THREE.RepeatWrapping;
+
+    const bumpTex = new THREE.CanvasTexture(bumpCanvas);
+    bumpTex.wrapS = THREE.RepeatWrapping;
+    bumpTex.wrapT = THREE.RepeatWrapping;
+
+    const roughTex = new THREE.CanvasTexture(roughCanvas);
+    roughTex.wrapS = THREE.RepeatWrapping;
+    roughTex.wrapT = THREE.RepeatWrapping;
+
+    return { diffTex, bumpTex, roughTex };
+  }
+
+  createSedimentarySlabGeometry(radius, thickness) {
+    const radialSegs = 14;
+    const geo = new THREE.CylinderGeometry(radius, radius * 1.06, thickness, radialSegs, 1);
+    const pos = geo.attributes.position;
+    const uvs = geo.attributes.uv;
+
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      const z = pos.getZ(i);
+
+      if (Math.abs(y) > thickness * 0.35) {
+        // Planar top-down mapping scaled to broad natural world coordinates (NO stretching or repeating stripes!)
+        uvs.setXY(i, (x / 7.5) + 0.5, (z / 7.5) + 0.5);
+        pos.setY(i, y + (Math.sin(x * 0.8) * Math.cos(z * 0.8)) * thickness * 0.12);
+      } else {
+        const angle = Math.atan2(z, x);
+        const dist = Math.hypot(x, z);
+        const jitter = 1 + (Math.sin(angle * 4.0) * 0.12 + Math.cos(angle * 7.0) * 0.08);
+        pos.setX(i, Math.cos(angle) * dist * jitter);
+        pos.setZ(i, Math.sin(angle) * dist * jitter);
+        uvs.setXY(i, (angle / (Math.PI * 2)) * 2.0, (y / thickness) + 0.5);
+      }
+    }
+    uvs.needsUpdate = true;
+    geo.computeVertexNormals();
+    return geo;
+  }
+
+  createFracturedBoulderGeometry(radius) {
+    const geo = new THREE.DodecahedronGeometry(radius, 1);
+    const pos = geo.attributes.position;
+    const uvs = geo.attributes.uv;
+
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      const z = pos.getZ(i);
+      const facet = 1 + (Math.sin(x * 2.2) * Math.sin(z * 2.2) + Math.cos(y * 2.8)) * 0.18;
+      pos.setXYZ(i, x * facet, y * Math.max(0.65, facet), z * facet);
+
+      const len = Math.hypot(x, y, z);
+      const u = 0.5 + Math.atan2(z, x) / (2 * Math.PI);
+      const v = 0.5 - Math.asin(y / Math.max(0.001, len)) / Math.PI;
+      uvs.setXY(i, u * 2.2, v * 2.2);
+    }
+    uvs.needsUpdate = true;
+    geo.computeVertexNormals();
+    return geo;
+  }
+
+  createMartianMineralConcretion(x, z, scale = 1.0) {
+    // Recreates Curiosity's "Blackthorn Salt Flower" concretion cluster
+    const group = new THREE.Group();
+    const concretionMat = new THREE.MeshStandardMaterial({
+      color: 0xc89d7c, // Mineral salt & desert varnish tan
+      roughness: 0.94,
+      metalness: 0.08,
+      flatShading: true
+    });
+
+    // Central rounded nodule
+    const coreGeo = new THREE.SphereGeometry(0.35 * scale, 8, 6);
+    const coreMesh = new THREE.Mesh(coreGeo, concretionMat);
+    coreMesh.scale.set(1.2, 0.4, 1.0);
+    group.add(coreMesh);
+
+    // 10 radial dendritic branching lobes
+    const lobeCount = 10;
+    for (let i = 0; i < lobeCount; i++) {
+      const angle = (i / lobeCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+      const lobeLen = (0.5 + Math.random() * 0.6) * scale;
+      const lobeWidth = (0.12 + Math.random() * 0.08) * scale;
+
+      const lobeGeo = new THREE.BoxGeometry(lobeLen, lobeWidth * 0.8, lobeWidth);
+      const lobeMesh = new THREE.Mesh(lobeGeo, concretionMat);
+
+      lobeMesh.position.set(
+        Math.cos(angle) * lobeLen * 0.5,
+        (Math.random() - 0.5) * 0.04 * scale,
+        Math.sin(angle) * lobeLen * 0.5
+      );
+      lobeMesh.rotation.y = -angle;
+      lobeMesh.rotation.z = (Math.random() - 0.5) * 0.2;
+      group.add(lobeMesh);
+
+      // Terminal branching nodules on lobes
+      const tipGeo = new THREE.DodecahedronGeometry(lobeWidth * 0.9, 0);
+      const tipMesh = new THREE.Mesh(tipGeo, concretionMat);
+      tipMesh.position.set(
+        Math.cos(angle) * lobeLen,
+        0.02 * scale,
+        Math.sin(angle) * lobeLen
+      );
+      group.add(tipMesh);
+    }
+
+    const y = this.getTerrainHeight(x, z) + 0.06 * scale;
+    group.position.set(x, y, z);
+    group.rotation.set((Math.random() - 0.5) * 0.2, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.2);
+    group.castShadow = true;
+    group.receiveShadow = true;
+    this.scene.add(group);
+  }
+
+  scatterMartianRocks() {
+    const { diffTex, bumpTex, roughTex } = this.createMartianRockTextures();
+
+    // Sedimentary slab & boulder material
+    const rockMat = new THREE.MeshStandardMaterial({
+      map: diffTex,
+      bumpMap: bumpTex,
+      bumpScale: 0.22,
+      roughnessMap: roughTex,
+      roughness: 0.88,
+      metalness: 0.06
+    });
+
+    // 1. Sedimentary Bedrock Shingle Slabs (Continuous landscape graphics)
+    for (let i = 0; i < 140; i++) {
+      const x = (Math.random() - 0.5) * 440;
+      const z = (Math.random() - 0.5) * 440;
+
+      // Clear habitat foundation and crash site core
+      if (Math.hypot(x, z - 25) < 14 || Math.hypot(x + 18, z + 12) < 9) continue;
+
+      const radius = 1.6 + Math.random() * 3.4;
+      const thickness = 0.22 + Math.random() * 0.28;
+      const slabGeo = this.createSedimentarySlabGeometry(radius, thickness);
+      const slab = new THREE.Mesh(slabGeo, rockMat);
+
+      const y = this.getTerrainHeight(x, z) + thickness * 0.35;
+      slab.position.set(x, y, z);
+
+      // Tilt slightly conforming to terrain slope (shingle effect)
+      slab.rotation.set(
+        (Math.random() - 0.5) * 0.25,
+        Math.random() * Math.PI * 2,
+        (Math.random() - 0.5) * 0.25
+      );
+      // Slabs don't cast shadows — no shadow draw calls for flat rocks (huge perf win)
+      slab.castShadow = false;
+      slab.receiveShadow = true;
+      this.scene.add(slab);
+    }
+
+    // 2. Angular Faceted Ventifact Boulders (Continuous landscape graphics)
+    for (let i = 0; i < 85; i++) {
+      const x = (Math.random() - 0.5) * 440;
+      const z = (Math.random() - 0.5) * 440;
+
+      if (Math.hypot(x, z - 25) < 14 || Math.hypot(x + 18, z + 12) < 9) continue;
+
+      const scale = 0.8 + Math.random() * 2.2;
+      const boulderGeo = this.createFracturedBoulderGeometry(scale);
+      const boulder = new THREE.Mesh(boulderGeo, rockMat);
+
+      const y = this.getTerrainHeight(x, z) + scale * 0.45;
+      boulder.position.set(x, y, z);
+      boulder.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+      boulder.castShadow = true;
+      boulder.receiveShadow = true;
+      this.scene.add(boulder);
 
       this.colliders.push({
         type: 'sphere',
@@ -641,2078 +1120,46 @@ class GameEngine3D {
       });
     }
 
-    // 2. Flat Shale Slabs (Matching foreground rocks in Image 1!)
-    for (let s = 0; s < 30; s++) {
-      const x = (Math.random() - 0.5) * 220;
-      const z = (Math.random() - 0.5) * 220;
-      if (Math.hypot(x, z - 25) < 14) continue;
-      if (Math.hypot(x + 85, z + 85) < 30) continue;
+    // 3. Vast Instanced Pebble & Gravel Field (Continuous landscape graphics)
+    const pebbleCount = 1600;
+    const pebbleGeo = new THREE.DodecahedronGeometry(0.18, 0);
+    const pebbleMat = new THREE.MeshStandardMaterial({
+      color: 0x9e4827,
+      roughness: 0.95,
+      metalness: 0.05
+    });
+    const pebbleMesh = new THREE.InstancedMesh(pebbleGeo, pebbleMat, pebbleCount);
+    const dummy = new THREE.Object3D();
 
-      const slabW = 1.6 + Math.random() * 2.2;
-      const slabL = 1.2 + Math.random() * 1.8;
-      const slabH = 0.18 + Math.random() * 0.22;
-      const slabGeo = new THREE.BoxGeometry(slabW, slabH, slabL);
-      const slab = new THREE.Mesh(slabGeo, slabMat);
-      const y = this.getTerrainHeight(x, z) + slabH * 0.4;
-      slab.position.set(x, y, z);
-      slab.rotation.set((Math.random() - 0.5) * 0.25, Math.random() * Math.PI, (Math.random() - 0.5) * 0.25);
-      slab.castShadow = true;
-      slab.receiveShadow = true;
-      this.scene.add(slab);
+    for (let i = 0; i < pebbleCount; i++) {
+      const px = (Math.random() - 0.5) * 460;
+      const pz = (Math.random() - 0.5) * 460;
+      const py = this.getTerrainHeight(px, pz) + 0.05;
+      const s = 0.4 + Math.random() * 1.4;
+
+      dummy.position.set(px, py, pz);
+      dummy.scale.set(s, s * 0.7, s);
+      dummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+      dummy.updateMatrix();
+
+      pebbleMesh.setMatrixAt(i, dummy.matrix);
     }
-  }
+    pebbleMesh.instanceMatrix.needsUpdate = true;
+    pebbleMesh.receiveShadow = true;
+    this.scene.add(pebbleMesh);
 
-  // ==========================================
-  // FUTURISTIC MARS RESEARCH COLONY & HABITATS (Reference Image 1)
-  // ==========================================
-  buildColonyComplex() {
-    if (this.colonyGroup) {
-      this.scene.remove(this.colonyGroup);
-    }
-    this.colonyGroup = new THREE.Group();
-
-    const hullMat = new THREE.MeshStandardMaterial({
-      color: 0xeeeeee,
-      metalness: 0.35,
-      roughness: 0.32
-    });
-    const ribMat = new THREE.MeshStandardMaterial({
-      color: 0x2e3036,
-      metalness: 0.8,
-      roughness: 0.35
-    });
-    const legMat = new THREE.MeshStandardMaterial({
-      color: 0x484a50,
-      metalness: 0.85,
-      roughness: 0.25
-    });
-    const goldWindowMat = new THREE.MeshStandardMaterial({
-      color: 0xd4af37, // Reflective gold observation glass
-      metalness: 0.95,
-      roughness: 0.1
-    });
-    const solarMat = new THREE.MeshStandardMaterial({
-      color: 0x112244,
-      metalness: 0.9,
-      roughness: 0.15
-    });
-
-    // Helper: create cylindrical habitat module (Image 1)
-    const createCylindricalHab = (x, z, length, radius, rotationY, hasLargeEndcapWindow = false) => {
-      const hab = new THREE.Group();
-      const y = this.getTerrainHeight(x, z) + radius + 0.6;
-      hab.position.set(x, y, z);
-      hab.rotation.y = rotationY;
-
-      // 1. Horizontal Main Cylinder Hull
-      const cylGeo = new THREE.CylinderGeometry(radius, radius, length, 28);
-      const cyl = new THREE.Mesh(cylGeo, hullMat);
-      cyl.rotation.z = Math.PI / 2;
-      cyl.castShadow = true;
-      cyl.receiveShadow = true;
-      hab.add(cyl);
-
-      // 2. Rounded Dome Endcaps
-      const capGeo = new THREE.SphereGeometry(radius, 24, 14, 0, Math.PI * 2, 0, Math.PI / 2);
-      
-      const cap1 = new THREE.Mesh(capGeo, hullMat);
-      cap1.rotation.z = -Math.PI / 2;
-      cap1.position.set(length * 0.5, 0, 0);
-      cap1.castShadow = true;
-      hab.add(cap1);
-
-      const cap2 = new THREE.Mesh(capGeo, hullMat);
-      cap2.rotation.z = Math.PI / 2;
-      cap2.position.set(-length * 0.5, 0, 0);
-      cap2.castShadow = true;
-      hab.add(cap2);
-
-      // 3. Iconic Circular Observation Endcap Window (Image 1)
-      if (hasLargeEndcapWindow) {
-        const ringGeo = new THREE.TorusGeometry(radius * 0.62, radius * 0.14, 12, 24);
-        const ring = new THREE.Mesh(ringGeo, ribMat);
-        ring.rotation.y = Math.PI / 2;
-        ring.position.set(length * 0.5 + radius * 0.92, 0, 0);
-        hab.add(ring);
-
-        const winGeo = new THREE.CircleGeometry(radius * 0.58, 24);
-        const win = new THREE.Mesh(winGeo, goldWindowMat);
-        win.rotation.y = Math.PI / 2;
-        win.position.set(length * 0.5 + radius * 0.95, 0, 0);
-        hab.add(win);
-      }
-
-      // 4. Circumferential Structural Ribs
-      const ribCount = Math.floor(length / 2.6);
-      for (let r = 0; r <= ribCount; r++) {
-        const rx = -length * 0.5 + (r / ribCount) * length;
-        const ribGeo = new THREE.TorusGeometry(radius + 0.05, 0.08, 8, 28);
-        const rib = new THREE.Mesh(ribGeo, ribMat);
-        rib.rotation.y = Math.PI / 2;
-        rib.position.set(rx, 0, 0);
-        rib.castShadow = true;
-        hab.add(rib);
-      }
-
-      // 5. Support Stilts & Footpads resting on Martian sand (Image 1)
-      const legPositions = [
-        { x: -length * 0.35, z: radius * 0.8 },
-        { x: -length * 0.35, z: -radius * 0.8 },
-        { x: length * 0.35, z: radius * 0.8 },
-        { x: length * 0.35, z: -radius * 0.8 }
-      ];
-      legPositions.forEach(lp => {
-        const stiltHeight = radius + 0.8;
-        const legGeo = new THREE.CylinderGeometry(0.08, 0.1, stiltHeight, 8);
-        const leg = new THREE.Mesh(legGeo, legMat);
-        leg.position.set(lp.x, -stiltHeight * 0.5, lp.z);
-        leg.castShadow = true;
-        hab.add(leg);
-
-        const padGeo = new THREE.CylinderGeometry(0.32, 0.36, 0.12, 10);
-        const pad = new THREE.Mesh(padGeo, legMat);
-        pad.position.set(lp.x, -stiltHeight, lp.z);
-        hab.add(pad);
-      });
-
-      return hab;
-    };
-
-    // Module 1: Habitat Beta (Crew Living Quarters with prominent circular portal, Image 1)
-    const habBeta = createCylindricalHab(16, 35, 14, 2.6, 0.35, true);
-    this.colonyGroup.add(habBeta);
-
-    // Module 2: Habitat Gamma (Science & Geology Laboratory)
-    const habGamma = createCylindricalHab(-18, 30, 12, 2.4, -0.4, true);
-    const radGeo = new THREE.BoxGeometry(4.2, 0.1, 2.2);
-    const rad = new THREE.Mesh(radGeo, solarMat);
-    rad.position.set(0, 3.2, 0);
-    rad.rotation.x = -Math.PI / 6;
-    habGamma.add(rad);
-    this.colonyGroup.add(habGamma);
-
-    // Module 3: Habitat Delta (ECLSS & Closed-Loop Agriculture Hub)
-    const habDelta = createCylindricalHab(6, 46, 13, 2.5, 1.2, false);
-    this.colonyGroup.add(habDelta);
-
-    // Interconnected Pressurized Corridors (Image 1)
-    const createCorridor = (x1, z1, x2, z2) => {
-      const dx = x2 - x1;
-      const dz = z2 - z1;
-      const dist = Math.hypot(dx, dz);
-      const angle = Math.atan2(dx, dz);
-      const mx = (x1 + x2) * 0.5;
-      const mz = (z1 + z2) * 0.5;
-      const my = this.getTerrainHeight(mx, mz) + 1.8;
-
-      const corGroup = new THREE.Group();
-      corGroup.position.set(mx, my, mz);
-      corGroup.rotation.y = angle;
-
-      const tubeGeo = new THREE.CylinderGeometry(1.25, 1.25, dist, 16);
-      const tube = new THREE.Mesh(tubeGeo, hullMat);
-      tube.rotation.x = Math.PI / 2;
-      tube.castShadow = true;
-      corGroup.add(tube);
-
-      const collarGeo = new THREE.TorusGeometry(1.35, 0.12, 8, 16);
-      const collar1 = new THREE.Mesh(collarGeo, ribMat);
-      collar1.position.z = -dist * 0.3;
-      corGroup.add(collar1);
-      const collar2 = collar1.clone();
-      collar2.position.z = dist * 0.3;
-      corGroup.add(collar2);
-
-      return corGroup;
-    };
-
-    // Connect Alpha Hub (0, 25) to Beta (16, 35) and Gamma (-18, 30)
-    this.colonyGroup.add(createCorridor(4, 26, 12, 33));
-    this.colonyGroup.add(createCorridor(-4, 25, -14, 29));
-    this.colonyGroup.add(createCorridor(14, 38, 8, 44));
-
-    // Futuristic Manned Exploration Rover (Reference Image 1)
-    this.buildExplorationRover();
-
-    // White Supply Containers & Scientific Cargo (Reference Image 1)
-    this.buildSupplyContainers();
-
-    this.scene.add(this.colonyGroup);
-  }
-
-  buildExplorationRover() {
-    this.explorationRoverGroup = new THREE.Group();
-    const rx = -11, rz = 12;
-    const ry = this.getTerrainHeight(rx, rz);
-    this.explorationRoverGroup.position.set(rx, ry, rz);
-    this.explorationRoverGroup.rotation.y = 0.45; // Angled facing the desert plain
-
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.35, metalness: 0.5 });
-    const glassMat = new THREE.MeshStandardMaterial({ color: 0x111622, roughness: 0.1, metalness: 0.95 });
-    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x222225, roughness: 0.9, metalness: 0.2 });
-    const darkChassisMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.7, metalness: 0.8 });
-
-    // 1. Aerodynamic Pressurized Cabin
-    const cabinGeo = new THREE.BoxGeometry(2.8, 1.8, 4.2);
-    const cabin = new THREE.Mesh(cabinGeo, bodyMat);
-    cabin.position.y = 1.9;
-    cabin.castShadow = true;
-    this.explorationRoverGroup.add(cabin);
-
-    // 2. Faceted Panoramic Front Cockpit Glass (Image 1)
-    const noseGeo = new THREE.CylinderGeometry(1.2, 1.4, 2.5, 5);
-    const nose = new THREE.Mesh(noseGeo, glassMat);
-    nose.rotation.x = Math.PI / 2;
-    nose.rotation.z = Math.PI / 5;
-    nose.position.set(0, 1.9, 2.1);
-    this.explorationRoverGroup.add(nose);
-
-    // Multi-pane observation window frames
-    const frameGeo = new THREE.BoxGeometry(2.5, 1.0, 0.1);
-    const frame = new THREE.Mesh(frameGeo, darkChassisMat);
-    frame.position.set(0, 2.1, 2.05);
-    frame.rotation.x = -Math.PI / 6;
-    this.explorationRoverGroup.add(frame);
-
-    // 3. Rooftop Equipment Rack & Steerable Parabolic Antenna (Image 1)
-    const mastGeo = new THREE.CylinderGeometry(0.08, 0.1, 1.6, 8);
-    const mast = new THREE.Mesh(mastGeo, darkChassisMat);
-    mast.position.set(0.6, 3.4, -0.6);
-    this.explorationRoverGroup.add(mast);
-
-    const dishGeo = new THREE.SphereGeometry(0.8, 16, 12, 0, Math.PI * 2, 0, Math.PI / 3);
-    const dish = new THREE.Mesh(dishGeo, bodyMat);
-    dish.rotation.x = -Math.PI / 4;
-    dish.position.set(0.6, 4.2, -0.6);
-    this.explorationRoverGroup.add(dish);
-
-    // Dual High-Intensity LED Searchlights
-    const lightGeo = new THREE.CylinderGeometry(0.18, 0.22, 0.3, 12);
-    const lightMat = new THREE.MeshBasicMaterial({ color: 0xffeedd });
-    [-0.8, 0.8].forEach(lx => {
-      const light = new THREE.Mesh(lightGeo, lightMat);
-      light.rotation.x = Math.PI / 2;
-      light.position.set(lx, 2.7, 1.6);
-      this.explorationRoverGroup.add(light);
-    });
-
-    // 4. Six Heavy-Duty High-Traction Wheels with Articulated Rocker-Bogie (Image 1)
-    const wheelPositions = [
-      { x: -1.7, z: 1.5 },
-      { x: 1.7, z: 1.5 },
-      { x: -1.75, z: 0.0 },
-      { x: 1.75, z: 0.0 },
-      { x: -1.7, z: -1.5 },
-      { x: 1.7, z: -1.5 }
+    // 4. Discoverable Dendritic "Martian Flower" Concretions (Rover Photo 2)
+    const flowerLocations = [
+      { x: -14, z: -7, s: 1.1 },  // Near crash site discovery
+      { x: -5,  z: 18, s: 1.3 },  // Approach to Habitat Alpha
+      { x: 38,  z: 16, s: 1.0 },  // Solar farm ridge
+      { x: -28, z: 34, s: 1.2 },  // ECLSS water corridor
+      { x: 50,  z: -4, s: 1.4 },  // Storm trench pass
+      { x: 74,  z: -12, s: 1.5 }  // Base of Crater Ridge
     ];
-
-    wheelPositions.forEach(wp => {
-      const strutGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.2, 8);
-      const strut = new THREE.Mesh(strutGeo, darkChassisMat);
-      strut.rotation.z = wp.x > 0 ? -0.3 : 0.3;
-      strut.position.set(wp.x * 0.7, 1.2, wp.z);
-      this.explorationRoverGroup.add(strut);
-
-      const tireGeo = new THREE.CylinderGeometry(0.65, 0.65, 0.52, 18);
-      const tire = new THREE.Mesh(tireGeo, wheelMat);
-      tire.rotation.z = Math.PI / 2;
-      tire.position.set(wp.x, 0.65, wp.z);
-      tire.castShadow = true;
-      this.explorationRoverGroup.add(tire);
-
-      const hubGeo = new THREE.CylinderGeometry(0.25, 0.25, 0.54, 12);
-      const hub = new THREE.Mesh(hubGeo, bodyMat);
-      hub.rotation.z = Math.PI / 2;
-      hub.position.set(wp.x, 0.65, wp.z);
-      this.explorationRoverGroup.add(hub);
+    flowerLocations.forEach(loc => {
+      this.createMartianMineralConcretion(loc.x, loc.z, loc.s);
     });
-
-    this.colonyGroup.add(this.explorationRoverGroup);
-  }
-
-  buildSupplyContainers() {
-    this.buildCarbonStorageBoxes();
-  }
-
-  // ==========================================
-  // INTERACTIVE CARBON-FIBRE STORAGE BOXES & 3D SURVIVAL SUPPLIES
-  // ==========================================
-  createCarbonWeaveTexture() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 128;
-    canvas.height = 128;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#18191c';
-    ctx.fillRect(0, 0, 128, 128);
-
-    const c1 = '#26272e';
-    const c2 = '#121316';
-    const s = 16;
-    for (let y = 0; y < 128; y += s) {
-      for (let x = 0; x < 128; x += s) {
-        const isWeave = ((x / s) + (y / s)) % 2 === 0;
-        ctx.fillStyle = isWeave ? c1 : c2;
-        ctx.fillRect(x, y, s, s);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
-        ctx.fillRect(x, y + s * 0.45, s, 2);
-      }
-    }
-
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(4, 3);
-    return tex;
-  }
-
-  buildCarbonStorageBoxes() {
-    // Clear any existing boxes
-    this.carbonBoxes.forEach(b => {
-      if (b.group && b.group.parent) b.group.parent.remove(b.group);
-    });
-    this.carbonBoxes = [];
-
-    const carbonTex = this.createCarbonWeaveTexture();
-    const carbonMat = new THREE.MeshStandardMaterial({
-      map: carbonTex,
-      roughness: 0.32,
-      metalness: 0.82
-    });
-    const titaniumMat = new THREE.MeshStandardMaterial({
-      color: 0x2d3036,
-      metalness: 0.92,
-      roughness: 0.22
-    });
-    const latchMat = new THREE.MeshStandardMaterial({
-      color: 0x4a505b,
-      metalness: 0.95,
-      roughness: 0.15
-    });
-
-    // 7 Strategic locations across Mars
-    const boxLocations = [
-      { id: 'box_landing', x: -16, z: -8, yaw: 0.25, items: ['packaged_ration', 'water_pouch', 'emergency_food'] },
-      { id: 'box_hab', x: -4, z: 16, yaw: -0.4, items: ['canned_food', 'nutrition_bar', 'packaged_ration'] },
-      { id: 'box_solar', x: 40, z: 22, yaw: 0.8, items: ['packaged_ration', 'water_pouch'] },
-      { id: 'box_eclss', x: -32, z: 38, yaw: 1.2, items: ['water_pouch', 'survival_medkit', 'nutrition_bar'] },
-      { id: 'box_desert', x: 22, z: -28, yaw: -0.6, items: ['emergency_food', 'packaged_ration', 'canned_food'] },
-      { id: 'box_storm', x: 50, z: -6, yaw: 0.1, items: ['nutrition_bar', 'water_pouch'] },
-      { id: 'box_ridge', x: 70, z: -14, yaw: -0.9, items: ['survival_medkit', 'emergency_food', 'packaged_ration'] }
-    ];
-
-    boxLocations.forEach(bLoc => {
-      const boxGroup = new THREE.Group();
-      const cy = this.getTerrainHeight(bLoc.x, bLoc.z);
-      boxGroup.position.set(bLoc.x, cy + 0.35, bLoc.z);
-      boxGroup.rotation.y = bLoc.yaw;
-
-      // 1. Lower Main Cargo Hull
-      const baseGeo = new THREE.BoxGeometry(1.25, 0.65, 0.75);
-      const baseMesh = new THREE.Mesh(baseGeo, carbonMat);
-      baseMesh.castShadow = true;
-      baseMesh.receiveShadow = true;
-      boxGroup.add(baseMesh);
-
-      // Corner titanium armor brackets
-      const bracketGeo = new THREE.BoxGeometry(1.29, 0.08, 0.79);
-      const topBracket = new THREE.Mesh(bracketGeo, titaniumMat);
-      topBracket.position.y = 0.28;
-      boxGroup.add(topBracket);
-
-      const btmBracket = new THREE.Mesh(bracketGeo, titaniumMat);
-      btmBracket.position.y = -0.28;
-      boxGroup.add(btmBracket);
-
-      // Neon Biometric Status Strip (Cyan when locked, Green when opened)
-      const ledMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff });
-      const ledGeo = new THREE.BoxGeometry(0.55, 0.06, 0.02);
-      const ledStrip = new THREE.Mesh(ledGeo, ledMat);
-      ledStrip.position.set(0, 0.18, 0.38);
-      boxGroup.add(ledStrip);
-
-      // Dual heavy mechanical latch levers
-      [-0.32, 0.32].forEach(lx => {
-        const latch = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.22, 0.05), latchMat);
-        latch.position.set(lx, 0.12, 0.39);
-        boxGroup.add(latch);
-      });
-
-      // 2. Animated Hinged Lid Pivot
-      const lidPivot = new THREE.Group();
-      lidPivot.position.set(0, 0.325, -0.375); // Hinge line along rear top
-
-      const lidMesh = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.12, 0.75), carbonMat);
-      lidMesh.position.set(0, 0.06, 0.375);
-      lidMesh.castShadow = true;
-      lidPivot.add(lidMesh);
-
-      const lidRim = new THREE.Mesh(new THREE.BoxGeometry(1.27, 0.04, 0.77), titaniumMat);
-      lidRim.position.set(0, 0.1, 0.375);
-      lidPivot.add(lidRim);
-
-      boxGroup.add(lidPivot);
-
-      // 3. Interior Compartment Lighting (Turns on when opened)
-      const interiorLight = new THREE.PointLight(0xfff0dd, 0, 3.5, 2.0);
-      interiorLight.position.set(0, 0.45, 0);
-      boxGroup.add(interiorLight);
-
-      // 4. 3D Collectible Food Items inside the container
-      const itemSlots = [];
-      const itemSpacing = 0.36;
-      const startX = -((bLoc.items.length - 1) * itemSpacing) * 0.5;
-
-      bLoc.items.forEach((itemKey, idx) => {
-        const itemObj = this.create3DFoodItem(itemKey);
-        if (itemObj) {
-          const ix = startX + idx * itemSpacing;
-          const iy = 0.18;
-          const iz = 0.02;
-          itemObj.position.set(ix, iy, iz);
-          boxGroup.add(itemObj);
-
-          itemSlots.push({
-            key: itemKey,
-            mesh: itemObj,
-            interactableRecord: null
-          });
-        }
-      });
-
-      this.scene.add(boxGroup);
-
-      // Box State Record
-      const boxRecord = {
-        id: bLoc.id,
-        group: boxGroup,
-        lidPivot: lidPivot,
-        ledStrip: ledStrip,
-        interiorLight: interiorLight,
-        isOpened: false,
-        isOpening: false,
-        openProgress: 0,
-        itemSlots: itemSlots
-      };
-      this.carbonBoxes.push(boxRecord);
-
-      // Register closed box interaction
-      const boxInteractable = {
-        type: 'carbon_box',
-        boxId: bLoc.id,
-        label: '[E] Open Carbon Storage Box',
-        mesh: baseMesh,
-        x: bLoc.x,
-        y: cy + 0.35,
-        z: bLoc.z,
-        callback: () => {
-          this.openCarbonStorageBox(boxRecord);
-        }
-      };
-      this.interactables.push(boxInteractable);
-    });
-  }
-
-  // Create high-detail 3D procedural models of survival rations
-  create3DFoodItem(itemKey) {
-    const itemGroup = new THREE.Group();
-
-    if (itemKey === 'packaged_ration') {
-      // Silver vacuum-sealed astronaut ration pouch
-      const foilMat = new THREE.MeshStandardMaterial({ color: 0xd8dde4, metalness: 0.95, roughness: 0.18 });
-      const labelMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff });
-      const pouch = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.06, 0.30), foilMat);
-      pouch.castShadow = true;
-      itemGroup.add(pouch);
-      const label = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.065, 0.16), labelMat);
-      itemGroup.add(label);
-    } else if (itemKey === 'canned_food') {
-      // Metallic protein ration tin with pull ring
-      const tinMat = new THREE.MeshStandardMaterial({ color: 0xadb5bd, metalness: 0.9, roughness: 0.25 });
-      const can = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.15, 18), tinMat);
-      can.castShadow = true;
-      itemGroup.add(can);
-    } else if (itemKey === 'nutrition_bar') {
-      // Shiny foil wrapped survival energy bar
-      const barMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.85, roughness: 0.28 });
-      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.045, 0.22), barMat);
-      bar.castShadow = true;
-      itemGroup.add(bar);
-    } else if (itemKey === 'water_pouch') {
-      // Translucent cyan potable water pouch with valved straw
-      const waterMat = new THREE.MeshStandardMaterial({
-        color: 0x33b5e5,
-        transparent: true,
-        opacity: 0.85,
-        roughness: 0.15,
-        metalness: 0.2
-      });
-      const pouch = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.055, 0.26), waterMat);
-      pouch.castShadow = true;
-      itemGroup.add(pouch);
-      const valve = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.08, 10), new THREE.MeshStandardMaterial({ color: 0xffffff }));
-      valve.position.set(0, 0.04, -0.12);
-      itemGroup.add(valve);
-    } else if (itemKey === 'emergency_food') {
-      // High-density compressed survival ration block
-      const brickMat = new THREE.MeshStandardMaterial({ color: 0xe65100, roughness: 0.65 });
-      const brick = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.08, 0.22), brickMat);
-      brick.castShadow = true;
-      itemGroup.add(brick);
-    } else if (itemKey === 'survival_medkit') {
-      // White and red survival first aid module
-      const medMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.35 });
-      const crossMat = new THREE.MeshBasicMaterial({ color: 0xff2222 });
-      const med = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.1, 0.22), medMat);
-      med.castShadow = true;
-      itemGroup.add(med);
-      const c1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.105, 0.04), crossMat);
-      const c2 = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.105, 0.12), crossMat);
-      itemGroup.add(c1);
-      itemGroup.add(c2);
-    }
-
-    return itemGroup;
-  }
-
-  // Open Carbon Storage Box Handler
-  openCarbonStorageBox(boxRecord) {
-    if (boxRecord.isOpened || boxRecord.isOpening) return;
-    boxRecord.isOpening = true;
-
-    if (window.soundSystem) {
-      if (window.soundSystem.playCarbonBoxOpen) window.soundSystem.playCarbonBoxOpen();
-      else window.soundSystem.playLockerUnlock();
-    }
-
-    // Update status LED to green
-    if (boxRecord.ledStrip) {
-      boxRecord.ledStrip.material.color.setHex(0x00ff88);
-    }
-    if (boxRecord.interiorLight) {
-      boxRecord.interiorLight.intensity = 1.8;
-    }
-
-    if (window.uiManager) {
-      window.uiManager.showBanner("📦 CARBON STORAGE BOX OPENED — SURVIVAL SUPPLIES READY");
-    }
-
-    // Increment explore_site objective
-    window.gameState.incrementObjective('explore_site');
-
-    // Remove the closed-box prompt from interactables
-    const bIdx = this.interactables.findIndex(i => i.boxId === boxRecord.id && i.type === 'carbon_box');
-    if (bIdx !== -1) {
-      this.interactables.splice(bIdx, 1);
-    }
-    this.hoveredObject = null;
-
-    // Register each inside item as an interactive target
-    boxRecord.itemSlots.forEach(slot => {
-      const dbItem = ITEM_DATABASE[slot.key];
-      const itemName = dbItem ? dbItem.name : "Survival Ration";
-      const itemRecord = {
-        type: 'pickup',
-        itemId: slot.key,
-        label: `[E] Take ${itemName}`,
-        mesh: slot.mesh,
-        callback: () => {
-          if (window.soundSystem) {
-            if (window.soundSystem.playCollectFood) window.soundSystem.playCollectFood();
-            else window.soundSystem.playPickup();
-          }
-          window.gameState.addItem(slot.key);
-          window.gameState.incrementObjective('collect_food');
-          if (window.uiManager) {
-            window.uiManager.showBanner(`✅ ${itemName.toUpperCase()} ADDED TO INVENTORY [TAB]`);
-          }
-          if (slot.mesh && slot.mesh.parent) {
-            slot.mesh.parent.remove(slot.mesh);
-          }
-        }
-      };
-      this.interactables.push(itemRecord);
-      slot.interactableRecord = itemRecord;
-    });
-  }
-
-  updateCarbonBoxes(delta) {
-    this.carbonBoxes.forEach(box => {
-      if (box.isOpening && !box.isOpened) {
-        box.openProgress += delta * 2.2;
-        const p = Math.min(1.0, box.openProgress);
-        // Pivot open by -115 degrees (-2.0 radians)
-        box.lidPivot.rotation.x = -p * 2.0;
-
-        if (p >= 1.0) {
-          box.isOpened = true;
-          box.isOpening = false;
-        }
-      }
-    });
-  }
-
-  // ==========================================
-  // REALISTIC WHITE EVA ASTRONAUTS (Reference Image 1)
-  // ==========================================
-  buildAstronautExplorers() {
-    if (this.astronautsGroup) {
-      this.scene.remove(this.astronautsGroup);
-    }
-    this.astronautsGroup = new THREE.Group();
-
-    const suitMat = new THREE.MeshStandardMaterial({
-      color: 0xf0f0f0,
-      roughness: 0.55,
-      metalness: 0.15
-    });
-    const visorMat = new THREE.MeshStandardMaterial({
-      color: 0xcca033, // Golden reflective EVA helmet visor
-      roughness: 0.08,
-      metalness: 0.96
-    });
-    const jointMat = new THREE.MeshStandardMaterial({
-      color: 0x333338,
-      roughness: 0.7
-    });
-    const packMat = new THREE.MeshStandardMaterial({
-      color: 0xe0e0e0,
-      roughness: 0.4,
-      metalness: 0.3
-    });
-    const stripeMat = new THREE.MeshStandardMaterial({
-      color: 0xd9531e, // NASA Ares mission orange
-      roughness: 0.5
-    });
-
-    const createAstronaut = (x, z, rotY) => {
-      const astro = new THREE.Group();
-      const y = this.getTerrainHeight(x, z);
-      astro.position.set(x, y, z);
-      astro.rotation.y = rotY;
-
-      // 1. Pressurized Suit Torso
-      const torsoGeo = new THREE.BoxGeometry(0.58, 0.75, 0.38);
-      const torso = new THREE.Mesh(torsoGeo, suitMat);
-      torso.position.y = 1.35;
-      torso.castShadow = true;
-      astro.add(torso);
-
-      // Chest Display Unit (DCM)
-      const dcmGeo = new THREE.BoxGeometry(0.28, 0.24, 0.08);
-      const dcm = new THREE.Mesh(dcmGeo, jointMat);
-      dcm.position.set(0, 1.45, 0.22);
-      astro.add(dcm);
-
-      // 2. Helmet with Golden Reflective Visor (Image 1)
-      const helmetGeo = new THREE.SphereGeometry(0.24, 18, 16);
-      const helmet = new THREE.Mesh(helmetGeo, suitMat);
-      helmet.position.set(0, 1.92, 0.02);
-      helmet.castShadow = true;
-      astro.add(helmet);
-
-      const visorGeo = new THREE.SphereGeometry(0.21, 16, 14, 0, Math.PI * 2, 0, Math.PI / 1.7);
-      const visor = new THREE.Mesh(visorGeo, visorMat);
-      visor.rotation.x = Math.PI / 2.3;
-      visor.position.set(0, 1.93, 0.08);
-      astro.add(visor);
-
-      // 3. PLSS Backpack (Portable Life Support System)
-      const packGeo = new THREE.BoxGeometry(0.52, 0.72, 0.28);
-      const pack = new THREE.Mesh(packGeo, packMat);
-      pack.position.set(0, 1.42, -0.26);
-      pack.castShadow = true;
-      astro.add(pack);
-
-      // Dual Oxygen Tanks on PLSS
-      [-0.14, 0.14].forEach(tx => {
-        const tankGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.6, 12);
-        const tank = new THREE.Mesh(tankGeo, packMat);
-        tank.position.set(tx, 1.45, -0.42);
-        astro.add(tank);
-      });
-
-      // Whip Antenna
-      const antGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.75, 6);
-      const ant = new THREE.Mesh(antGeo, jointMat);
-      ant.position.set(-0.2, 2.05, -0.32);
-      astro.add(ant);
-
-      // 4. Articulated Legs & Heavy Martian Boots
-      [-0.15, 0.15].forEach(lx => {
-        const thighGeo = new THREE.CylinderGeometry(0.12, 0.11, 0.45, 10);
-        const thigh = new THREE.Mesh(thighGeo, suitMat);
-        thigh.position.set(lx, 0.85, 0);
-        thigh.castShadow = true;
-        astro.add(thigh);
-
-        const shinGeo = new THREE.CylinderGeometry(0.11, 0.12, 0.45, 10);
-        const shin = new THREE.Mesh(shinGeo, suitMat);
-        shin.position.set(lx, 0.42, 0.02);
-        shin.castShadow = true;
-        astro.add(shin);
-
-        const bootGeo = new THREE.BoxGeometry(0.22, 0.18, 0.34);
-        const boot = new THREE.Mesh(bootGeo, jointMat);
-        boot.position.set(lx, 0.1, 0.08);
-        boot.castShadow = true;
-        astro.add(boot);
-      });
-
-      // 5. Articulated Arms & Gloves
-      [-1, 1].forEach(sign => {
-        const armGeo = new THREE.CylinderGeometry(0.09, 0.08, 0.45, 10);
-        const arm = new THREE.Mesh(armGeo, suitMat);
-        arm.position.set(sign * 0.38, 1.35, 0);
-        arm.rotation.z = -sign * 0.18;
-        arm.castShadow = true;
-        astro.add(arm);
-
-        const stripeGeo = new THREE.CylinderGeometry(0.092, 0.092, 0.08, 10);
-        const stripe = new THREE.Mesh(stripeGeo, stripeMat);
-        stripe.position.set(sign * 0.38, 1.48, 0);
-        astro.add(stripe);
-
-        const gloveGeo = new THREE.BoxGeometry(0.12, 0.12, 0.16);
-        const glove = new THREE.Mesh(gloveGeo, jointMat);
-        glove.position.set(sign * 0.42, 1.05, 0.06);
-        glove.castShadow = true;
-        astro.add(glove);
-      });
-
-      return astro;
-    };
-
-    // Astronaut 1: In front of colony surveying the dunes (Image 1)
-    const astro1 = createAstronaut(-3.8, 8.5, 0.2);
-    this.astronautsGroup.add(astro1);
-
-    // Astronaut 2: Standing near the white supply crate looking toward the mountains (Image 1)
-    const astro2 = createAstronaut(2.8, 7.6, -0.4);
-    this.astronautsGroup.add(astro2);
-
-    this.scene.add(this.astronautsGroup);
-  }
-
-  // ==========================================
-  // SPACEX-INSPIRED STARSHIP & LAUNCH COMPLEX
-  // ==========================================
-  buildRocketLaunchComplex() {
-    if (this.rocketComplex) {
-      this.scene.remove(this.rocketComplex);
-    }
-    this.rocketComplex = new THREE.Group();
-
-    const px = -85, pz = -85;
-    const py = this.getTerrainHeight(px, pz);
-    this.rocketComplex.position.set(px, py, pz);
-
-    // High-tech aerospace materials
-    const steelMat = new THREE.MeshStandardMaterial({
-      color: 0xe6ecf2, // Gleaming stainless steel 304L
-      metalness: 0.96,
-      roughness: 0.16
-    });
-    const heatShieldTileMat = new THREE.MeshStandardMaterial({
-      color: 0x111214, // Hexagonal ceramic thermal protection tiles
-      metalness: 0.65,
-      roughness: 0.35
-    });
-    const towerSteelMat = new THREE.MeshStandardMaterial({
-      color: 0x363940,
-      metalness: 0.85,
-      roughness: 0.38
-    });
-    const towerArmMat = new THREE.MeshStandardMaterial({
-      color: 0xc4301d, // Mechazilla crimson & hazard accents
-      metalness: 0.75,
-      roughness: 0.35
-    });
-    const trenchMat = new THREE.MeshStandardMaterial({
-      color: 0x161618,
-      roughness: 0.95
-    });
-    const engineNozzleMat = new THREE.MeshStandardMaterial({
-      color: 0x242428,
-      metalness: 0.98,
-      roughness: 0.22
-    });
-
-    // 1. Mobile Launcher Platform Mount & Flame Deflector Trench
-    const mlpGeo = new THREE.BoxGeometry(36, 4.5, 32);
-    const mlp = new THREE.Mesh(mlpGeo, towerSteelMat);
-    mlp.position.y = 2.25;
-    mlp.castShadow = true;
-    mlp.receiveShadow = true;
-    this.rocketComplex.add(mlp);
-
-    const trenchGeo = new THREE.BoxGeometry(16, 5.2, 12);
-    const trench = new THREE.Mesh(trenchGeo, trenchMat);
-    trench.position.set(0, 1.4, 0);
-    this.rocketComplex.add(trench);
-
-    // Launch Mount Staging Ring with 20 Hold-Down Clamps
-    const mountRingGeo = new THREE.CylinderGeometry(4.2, 4.6, 2.8, 32);
-    const mountRing = new THREE.Mesh(mountRingGeo, towerSteelMat);
-    mountRing.position.y = 4.8;
-    this.rocketComplex.add(mountRing);
-
-    // 2. Mechazilla Launch Tower (65m Structural Steel Lattice Tower with Chopsticks)
-    const towerHeight = 65;
-    const towerGroup = new THREE.Group();
-    towerGroup.position.set(13, 4.5, 0);
-
-    const colGeo = new THREE.BoxGeometry(1.0, towerHeight, 1.0);
-    [
-      { x: -3.0, z: -3.0 },
-      { x: 3.0, z: -3.0 },
-      { x: -3.0, z: 3.0 },
-      { x: 3.0, z: 3.0 }
-    ].forEach(c => {
-      const col = new THREE.Mesh(colGeo, towerSteelMat);
-      col.position.set(c.x, towerHeight * 0.5, c.z);
-      col.castShadow = true;
-      towerGroup.add(col);
-    });
-
-    // Cross-bracing and gantry floor platforms
-    for (let t = 0; t < 9; t++) {
-      const ty = t * 7.0 + 3.5;
-      const tierGeo = new THREE.BoxGeometry(7.2, 0.35, 7.2);
-      const tier = new THREE.Mesh(tierGeo, towerSteelMat);
-      tier.position.y = ty;
-      towerGroup.add(tier);
-
-      // Diagonal structural braces
-      const braceGeo = new THREE.CylinderGeometry(0.14, 0.14, 8.8, 8);
-      const b1 = new THREE.Mesh(braceGeo, towerSteelMat);
-      b1.rotation.z = Math.PI / 4;
-      b1.position.set(0, ty + 3.5, -3.0);
-      towerGroup.add(b1);
-    }
-
-    // Mechazilla "Chopsticks" Catching Carriage & Arms
-    const carriageGeo = new THREE.BoxGeometry(2.5, 5.0, 7.5);
-    const carriage = new THREE.Mesh(carriageGeo, towerArmMat);
-    carriage.position.set(-3.2, 42, 0);
-    towerGroup.add(carriage);
-
-    // Dual Catching Arms extending toward the rocket
-    [-2.2, 2.2].forEach(az => {
-      const armGeo = new THREE.BoxGeometry(11.5, 0.8, 0.6);
-      const arm = new THREE.Mesh(armGeo, towerArmMat);
-      arm.position.set(-8.5, 42, az);
-      arm.castShadow = true;
-      towerGroup.add(arm);
-    });
-
-    // Quick Disconnect (QD) Cryogenic Umbilical Service Arm
-    const qdArmGeo = new THREE.BoxGeometry(9.0, 0.6, 1.0);
-    const qdArm = new THREE.Mesh(qdArmGeo, towerSteelMat);
-    qdArm.position.set(-7.5, 48, 0);
-    towerGroup.add(qdArm);
-
-    // Red Flashing Aviation Safety Beacons
-    const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-    const beaconGeo = new THREE.SphereGeometry(0.35, 12, 12);
-    const beacon = new THREE.Mesh(beaconGeo, beaconMat);
-    beacon.position.set(0, towerHeight + 0.8, 0);
-    towerGroup.add(beacon);
-
-    this.rocketComplex.add(towerGroup);
-
-    // 3. Cryogenic Propellant Tank Farm (Liquid Oxygen & Liquid Methane Storage)
-    const tankMat = new THREE.MeshStandardMaterial({ color: 0xf0f4f8, metalness: 0.6, roughness: 0.3 });
-    [
-      { x: 30, z: -15, r: 4.5 },
-      { x: 30, z: 15, r: 4.5 },
-      { x: 42, z: 0, r: 5.5 }
-    ].forEach(tp => {
-      const sphere = new THREE.Mesh(new THREE.SphereGeometry(tp.r, 24, 18), tankMat);
-      sphere.position.set(tp.x, tp.r + 0.5, tp.z);
-      sphere.castShadow = true;
-      this.rocketComplex.add(sphere);
-
-      // Support legs
-      for (let sl = 0; sl < 4; sl++) {
-        const ang = (sl / 4) * Math.PI * 2;
-        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, tp.r, 8), towerSteelMat);
-        leg.position.set(tp.x + Math.sin(ang) * (tp.r * 0.7), tp.r * 0.5, tp.z + Math.cos(ang) * (tp.r * 0.7));
-        this.rocketComplex.add(leg);
-      }
-    });
-
-    // 4. THE SPACEX STARSHIP & SUPER HEAVY LAUNCH VEHICLE
-    this.rocketStack = new THREE.Group();
-    this.rocketStack.position.set(0, 4.8, 0);
-
-    // ==========================================
-    // STAGE 1: SUPER HEAVY BOOSTER (Height 48m, Radius 3.2m)
-    // ==========================================
-    this.superHeavyBooster = new THREE.Group();
-    this.superHeavyBooster.position.set(0, 0, 0);
-
-    const boosterHeight = 46;
-    const boosterRadius = 3.2;
-
-    const boosterGeo = new THREE.CylinderGeometry(boosterRadius, boosterRadius, boosterHeight, 36);
-    const boosterMesh = new THREE.Mesh(boosterGeo, steelMat);
-    boosterMesh.position.y = boosterHeight * 0.5 + 2.5;
-    boosterMesh.castShadow = true;
-    this.superHeavyBooster.add(boosterMesh);
-
-    // Super Heavy Interstage Vented Ring
-    const interstageGeo = new THREE.CylinderGeometry(boosterRadius + 0.05, boosterRadius + 0.05, 3.2, 36, 1, true);
-    const interstageMesh = new THREE.Mesh(interstageGeo, towerSteelMat);
-    interstageMesh.position.y = boosterHeight + 2.5;
-    this.superHeavyBooster.add(interstageMesh);
-
-    // 4 Titanium Lattice Grid Fins for Hypersonic Control
-    this.gridFins = [];
-    const gridFinMat = new THREE.MeshStandardMaterial({ color: 0x2b2d32, metalness: 0.9, roughness: 0.25 });
-    for (let gf = 0; gf < 4; gf++) {
-      const ang = (gf / 4) * Math.PI * 2;
-      const finGroup = new THREE.Group();
-      finGroup.position.set(
-        Math.sin(ang) * (boosterRadius + 0.2),
-        boosterHeight + 1.2,
-        Math.cos(ang) * (boosterRadius + 0.2)
-      );
-      finGroup.rotation.y = ang;
-
-      const finGeo = new THREE.BoxGeometry(0.18, 1.8, 2.8);
-      const finMesh = new THREE.Mesh(finGeo, gridFinMat);
-      finGroup.add(finMesh);
-      this.superHeavyBooster.add(finGroup);
-      this.gridFins.push(finGroup);
-    }
-
-    // 33 Raptor Booster Engine Cluster Nozzles
-    this.boosterNozzles = [];
-    const createRaptorNozzle = (x, z) => {
-      const nozGeo = new THREE.CylinderGeometry(0.28, 0.65, 1.8, 16);
-      const noz = new THREE.Mesh(nozGeo, engineNozzleMat);
-      noz.position.set(x, 1.6, z);
-      this.superHeavyBooster.add(noz);
-      this.boosterNozzles.push(noz);
-      return noz;
-    };
-
-    // Center cluster of 3
-    createRaptorNozzle(0, 0);
-    createRaptorNozzle(0.7, 0);
-    createRaptorNozzle(-0.7, 0);
-
-    // Inner ring of 10
-    for (let r1 = 0; r1 < 10; r1++) {
-      const a = (r1 / 10) * Math.PI * 2;
-      createRaptorNozzle(Math.sin(a) * 1.5, Math.cos(a) * 1.5);
-    }
-    // Outer ring of 20
-    for (let r2 = 0; r2 < 20; r2++) {
-      const a = (r2 / 20) * Math.PI * 2;
-      createRaptorNozzle(Math.sin(a) * 2.6, Math.cos(a) * 2.6);
-    }
-
-    this.rocketStack.add(this.superHeavyBooster);
-
-    // ==========================================
-    // STAGE 2: STARSHIP UPPER STAGE (Height 32m, Radius 3.0m)
-    // ==========================================
-    this.spacexStarship = new THREE.Group();
-    this.spacexStarship.position.set(0, boosterHeight + 3.0, 0);
-
-    const shipCylinderHeight = 20;
-    const shipRadius = 3.0;
-
-    // Starship Body Cylinder (Stainless Steel Half)
-    const shipGeo = new THREE.CylinderGeometry(shipRadius, shipRadius, shipCylinderHeight, 36);
-    const shipBody = new THREE.Mesh(shipGeo, steelMat);
-    shipBody.position.y = shipCylinderHeight * 0.5;
-    shipBody.castShadow = true;
-    this.spacexStarship.add(shipBody);
-
-    // Starship Hexagonal Heat Shield Half (Windward Side)
-    const heatShieldGeo = new THREE.CylinderGeometry(shipRadius + 0.03, shipRadius + 0.03, shipCylinderHeight, 36, 1, false, -Math.PI * 0.5, Math.PI);
-    const heatShieldMesh = new THREE.Mesh(heatShieldGeo, heatShieldTileMat);
-    heatShieldMesh.position.y = shipCylinderHeight * 0.5;
-    this.spacexStarship.add(heatShieldMesh);
-
-    // Starship Ogive Aerodynamic Nosecone
-    const noseHeight = 12;
-    const noseGeo = new THREE.ConeGeometry(shipRadius, noseHeight, 36);
-    const noseMesh = new THREE.Mesh(noseGeo, steelMat);
-    noseMesh.position.y = shipCylinderHeight + noseHeight * 0.5;
-    noseMesh.castShadow = true;
-    this.spacexStarship.add(noseMesh);
-
-    const noseHeatGeo = new THREE.ConeGeometry(shipRadius + 0.03, noseHeight, 36, 1, false, -Math.PI * 0.5, Math.PI);
-    const noseHeatMesh = new THREE.Mesh(noseHeatGeo, heatShieldTileMat);
-    noseHeatMesh.position.y = shipCylinderHeight + noseHeight * 0.5;
-    this.spacexStarship.add(noseHeatMesh);
-
-    // Forward Aerodynamic Flaps (Canards)
-    this.aerodynamicFlaps = [];
-    [-1, 1].forEach(side => {
-      const flapGroup = new THREE.Group();
-      flapGroup.position.set(side * 2.8, shipCylinderHeight + noseHeight * 0.35, 0);
-
-      const fGeo = new THREE.BoxGeometry(0.15, 3.2, 1.8);
-      const fMesh = new THREE.Mesh(fGeo, side < 0 ? heatShieldTileMat : steelMat);
-      fMesh.position.set(side * 0.9, 0, 0);
-      flapGroup.add(fMesh);
-      this.spacexStarship.add(flapGroup);
-      this.aerodynamicFlaps.push(flapGroup);
-    });
-
-    // Aft Large Delta Body Flaps
-    [-1, 1].forEach(side => {
-      const aftGroup = new THREE.Group();
-      aftGroup.position.set(side * 2.9, 4.5, 0);
-
-      const afGeo = new THREE.BoxGeometry(0.2, 6.2, 2.8);
-      const afMesh = new THREE.Mesh(afGeo, side < 0 ? heatShieldTileMat : steelMat);
-      afMesh.position.set(side * 1.4, 0, 0);
-      afMesh.castShadow = true;
-      aftGroup.add(afMesh);
-      this.spacexStarship.add(aftGroup);
-      this.aerodynamicFlaps.push(aftGroup);
-    });
-
-    // Starship Raptor Engines (3 Vacuum + 3 Center Sea-Level)
-    this.shipNozzles = [];
-    const createShipNozzle = (x, z, isVac) => {
-      const nR = isVac ? 0.95 : 0.55;
-      const nH = isVac ? 2.6 : 1.8;
-      const nGeo = new THREE.CylinderGeometry(0.3, nR, nH, 20);
-      const noz = new THREE.Mesh(nGeo, engineNozzleMat);
-      noz.position.set(x, -0.6, z);
-      this.spacexStarship.add(noz);
-      this.shipNozzles.push(noz);
-      return noz;
-    };
-
-    // 3 Center sea-level Raptors
-    createShipNozzle(0, 0.6, false);
-    createShipNozzle(-0.52, -0.3, false);
-    createShipNozzle(0.52, -0.3, false);
-
-    // 3 Large vacuum Raptor bells
-    createShipNozzle(0, -1.6, true);
-    createShipNozzle(-1.38, 0.8, true);
-    createShipNozzle(1.38, 0.8, true);
-
-    // Cockpit Flight Deck Visor Window & Interior Illumination
-    const cockpitGeo = new THREE.BoxGeometry(0.8, 1.2, 0.1);
-    const cockpitGlass = new THREE.Mesh(cockpitGeo, new THREE.MeshStandardMaterial({
-      color: 0x00e5ff,
-      emissive: 0x007799,
-      emissiveIntensity: 0.8,
-      metalness: 0.9,
-      roughness: 0.1
-    }));
-    cockpitGlass.position.set(0, shipCylinderHeight + 4.5, 2.8);
-    this.spacexStarship.add(cockpitGlass);
-
-    // Cockpit Red Alert Flashing Light (for Tentacle sequence)
-    this.cockpitRedAlertLight = new THREE.PointLight(0xff0022, 0, 15, 2.0);
-    this.cockpitRedAlertLight.position.set(0, shipCylinderHeight + 4.5, 2.5);
-    this.spacexStarship.add(this.cockpitRedAlertLight);
-
-    this.rocketStack.add(this.spacexStarship);
-    this.rocketComplex.add(this.rocketStack);
-
-    // 5. Engine Combustion Flames & VFX
-    this.buildEngineFlames();
-    this.buildLaunchVfx();
-
-    this.scene.add(this.rocketComplex);
-
-    // Launch Complex Platform Collider
-    this.colliders.push({
-      type: 'box',
-      minX: px - 18,
-      maxX: px + 18,
-      minZ: pz - 16,
-      maxZ: pz + 16
-    });
-  }
-
-  // ==========================================
-  // SUPERSONIC SHOCK DIAMOND COMBUSTION FLAMES
-  // ==========================================
-  buildEngineFlames() {
-    this.engineFlames = [];
-
-    const createPlume = (parent, x, y, z, r, len) => {
-      const plumeGroup = new THREE.Group();
-      plumeGroup.position.set(x, y, z);
-
-      // Outer supersonic combustion sheath (orange/blue)
-      const outerGeo = new THREE.ConeGeometry(r, len, 24, 1, true);
-      const outerMat = new THREE.MeshBasicMaterial({
-        color: 0x3388ff,
-        transparent: true,
-        opacity: 0.85,
-        blending: THREE.AdditiveBlending
-      });
-      const outer = new THREE.Mesh(outerGeo, outerMat);
-      outer.rotation.x = Math.PI;
-      outer.position.y = -len * 0.5;
-      plumeGroup.add(outer);
-
-      // Supersonic Shock Diamond core (bright white/yellow)
-      const innerGeo = new THREE.ConeGeometry(r * 0.45, len * 0.8, 16, 1, true);
-      const innerMat = new THREE.MeshBasicMaterial({
-        color: 0xffffff,
-        transparent: true,
-        opacity: 0.95,
-        blending: THREE.AdditiveBlending
-      });
-      const inner = new THREE.Mesh(innerGeo, innerMat);
-      inner.rotation.x = Math.PI;
-      inner.position.y = -len * 0.4;
-      plumeGroup.add(inner);
-
-      // Shock Diamond Rings
-      for (let d = 1; d <= 4; d++) {
-        const ringGeo = new THREE.TorusGeometry(r * 0.35 * (1 - d * 0.18), 0.08, 8, 16);
-        const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xffeedd, blending: THREE.AdditiveBlending }));
-        ring.rotation.x = Math.PI / 2;
-        ring.position.y = -d * (len * 0.18);
-        plumeGroup.add(ring);
-      }
-
-      plumeGroup.visible = false;
-      parent.add(plumeGroup);
-      this.engineFlames.push(plumeGroup);
-      return plumeGroup;
-    };
-
-    // Booster Raptor Plumes (Massive Cluster)
-    createPlume(this.superHeavyBooster, 0, 0, 0, 3.8, 26.0);
-    createPlume(this.superHeavyBooster, -1.6, 0, 0, 2.5, 20.0);
-    createPlume(this.superHeavyBooster, 1.6, 0, 0, 2.5, 20.0);
-
-    // Starship Upper Stage Raptors (6 engines)
-    this.shipNozzles.forEach(noz => {
-      createPlume(noz, 0, -0.8, 0, 1.1, 9.5);
-    });
-
-    // Launch Pad Illumination Light
-    this.rocketPointLight = new THREE.PointLight(0xffa244, 0, 220, 1.4);
-    this.rocketPointLight.position.set(0, 3.0, 0);
-    this.rocketStack.add(this.rocketPointLight);
-  }
-
-  // ==========================================
-  // LAUNCH VFX: CRYOGENIC VAPOR & GROUND SMOKE
-  // ==========================================
-  buildLaunchVfx() {
-    // 1. Cryogenic Boil-Off Vapor Venting
-    const ventCount = 220;
-    const ventGeo = new THREE.BufferGeometry();
-    const ventPos = new Float32Array(ventCount * 3);
-    for (let i = 0; i < ventCount; i++) {
-      ventPos[i * 3] = (Math.random() - 0.5) * 2.2;
-      ventPos[i * 3 + 1] = 46 + Math.random() * 6;
-      ventPos[i * 3 + 2] = (Math.random() - 0.5) * 2.2;
-    }
-    ventGeo.setAttribute('position', new THREE.BufferAttribute(ventPos, 3));
-    const ventMat = new THREE.PointsMaterial({
-      color: 0xffffff,
-      size: 1.4,
-      transparent: true,
-      opacity: 0.45,
-      blending: THREE.NormalBlending
-    });
-    this.cryoVaporParticles = new THREE.Points(ventGeo, ventMat);
-    this.rocketStack.add(this.cryoVaporParticles);
-
-    // 2. Billowing Ground Launch Smoke Cloud Field
-    const smokeCount = 850;
-    const smokeGeo = new THREE.BufferGeometry();
-    const smokePos = new Float32Array(smokeCount * 3);
-    this.smokeVelocities = new Float32Array(smokeCount * 3);
-
-    for (let i = 0; i < smokeCount; i++) {
-      smokePos[i * 3] = (Math.random() - 0.5) * 8;
-      smokePos[i * 3 + 1] = 1.0 + Math.random() * 2;
-      smokePos[i * 3 + 2] = (Math.random() - 0.5) * 8;
-
-      const angle = Math.random() * Math.PI * 2;
-      const spd = 7 + Math.random() * 24;
-      this.smokeVelocities[i * 3] = Math.cos(angle) * spd;
-      this.smokeVelocities[i * 3 + 1] = 1.5 + Math.random() * 7;
-      this.smokeVelocities[i * 3 + 2] = Math.sin(angle) * spd;
-    }
-    smokeGeo.setAttribute('position', new THREE.BufferAttribute(smokePos, 3));
-
-    const smokeMat = new THREE.PointsMaterial({
-      color: 0xe6b588,
-      size: 4.5,
-      transparent: true,
-      opacity: 0.0,
-      blending: THREE.NormalBlending
-    });
-    this.launchSmokeParticles = new THREE.Points(smokeGeo, smokeMat);
-    this.launchSmokeParticles.position.set(0, 0, 0);
-    this.rocketComplex.add(this.launchSmokeParticles);
-  }
-
-  // ==========================================
-  // DEEP SPACE, 3D EARTH, 3D MARS & ALIEN TENTACLE
-  // ==========================================
-  buildSpaceAndEarthScene() {
-    this.spaceSceneGroup = new THREE.Group();
-    this.spaceSceneGroup.position.set(-85, 620, -85);
-    this.spaceSceneGroup.visible = false;
-
-    // 1. Deep Space Starfield (3,500 Twinkling Cosmic Stars)
-    const starCount = 3500;
-    const starGeo = new THREE.BufferGeometry();
-    const starPos = new Float32Array(starCount * 3);
-    const starColors = new Float32Array(starCount * 3);
-
-    for (let i = 0; i < starCount; i++) {
-      const u = Math.random();
-      const v = Math.random();
-      const theta = u * 2.0 * Math.PI;
-      const phi = Math.acos(2.0 * v - 1.0);
-      const r = 400 + Math.random() * 150;
-
-      starPos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      starPos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-      starPos[i * 3 + 2] = r * Math.cos(phi);
-
-      const temp = Math.random();
-      if (temp > 0.75) {
-        starColors[i * 3] = 0.85; starColors[i * 3 + 1] = 0.92; starColors[i * 3 + 2] = 1.0;
-      } else if (temp > 0.4) {
-        starColors[i * 3] = 1.0; starColors[i * 3 + 1] = 1.0; starColors[i * 3 + 2] = 1.0;
-      } else if (temp > 0.15) {
-        starColors[i * 3] = 1.0; starColors[i * 3 + 1] = 0.92; starColors[i * 3 + 2] = 0.7;
-      } else {
-        starColors[i * 3] = 1.0; starColors[i * 3 + 1] = 0.65; starColors[i * 3 + 2] = 0.45;
-      }
-    }
-    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-    starGeo.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
-
-    const starMat = new THREE.PointsMaterial({
-      size: 1.4,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.92
-    });
-    this.starField = new THREE.Points(starGeo, starMat);
-    this.spaceSceneGroup.add(this.starField);
-
-    // 2. Spectacular 3D Planet Earth (With Swirling Clouds & Blue Atmospheric Limb)
-    this.earthGroup = new THREE.Group();
-    this.earthGroup.position.set(0, 45, -140);
-
-    const earthCanvas = document.createElement('canvas');
-    earthCanvas.width = 1024;
-    earthCanvas.height = 512;
-    const eCtx = earthCanvas.getContext('2d');
-    const oceanGrad = eCtx.createLinearGradient(0, 0, 0, 512);
-    oceanGrad.addColorStop(0.0, '#103055');
-    oceanGrad.addColorStop(0.5, '#16487e');
-    oceanGrad.addColorStop(1.0, '#0e2b4d');
-    eCtx.fillStyle = oceanGrad;
-    eCtx.fillRect(0, 0, 1024, 512);
-
-    eCtx.fillStyle = '#2d5e2e'; // Continents
-    eCtx.beginPath();
-    eCtx.ellipse(280, 210, 110, 85, -0.2, 0, Math.PI * 2);
-    eCtx.ellipse(340, 360, 75, 110, 0.3, 0, Math.PI * 2);
-    eCtx.ellipse(620, 180, 180, 95, 0.1, 0, Math.PI * 2);
-    eCtx.ellipse(580, 310, 90, 120, -0.1, 0, Math.PI * 2);
-    eCtx.fill();
-
-    eCtx.fillStyle = '#b38848';
-    eCtx.beginPath();
-    eCtx.ellipse(570, 260, 65, 35, 0, 0, Math.PI * 2);
-    eCtx.ellipse(820, 380, 60, 45, 0, 0, Math.PI * 2);
-    eCtx.fill();
-
-    eCtx.fillStyle = '#ffffff'; // Ice caps
-    eCtx.fillRect(0, 0, 1024, 38);
-    eCtx.fillRect(0, 474, 1024, 38);
-
-    const earthTexture = new THREE.CanvasTexture(earthCanvas);
-    const earthMat = new THREE.MeshStandardMaterial({
-      map: earthTexture,
-      roughness: 0.65,
-      metalness: 0.15
-    });
-    this.earthMesh = new THREE.Mesh(new THREE.SphereGeometry(52, 48, 36), earthMat);
-    this.earthGroup.add(this.earthMesh);
-
-    // Dynamic Clouds
-    const cloudCanvas = document.createElement('canvas');
-    cloudCanvas.width = 1024;
-    cloudCanvas.height = 512;
-    const clCtx = cloudCanvas.getContext('2d');
-    clCtx.clearRect(0, 0, 1024, 512);
-    clCtx.fillStyle = 'rgba(255, 255, 255, 0.75)';
-    for (let sw = 0; sw < 32; sw++) {
-      const sx = Math.random() * 1024;
-      const sy = 80 + Math.random() * 350;
-      clCtx.beginPath();
-      clCtx.ellipse(sx, sy, 80 + Math.random() * 70, 25 + Math.random() * 30, (Math.random() - 0.5) * 0.8, 0, Math.PI * 2);
-      clCtx.fill();
-    }
-    const cloudTex = new THREE.CanvasTexture(cloudCanvas);
-    const cloudMat = new THREE.MeshBasicMaterial({
-      map: cloudTex,
-      transparent: true,
-      opacity: 0.75
-    });
-    this.earthClouds = new THREE.Mesh(new THREE.SphereGeometry(53.2, 48, 36), cloudMat);
-    this.earthGroup.add(this.earthClouds);
-
-    // Atmospheric limb glow
-    const haloMat = new THREE.MeshBasicMaterial({
-      color: 0x00b4d8,
-      transparent: true,
-      opacity: 0.32,
-      side: THREE.BackSide,
-      blending: THREE.AdditiveBlending
-    });
-    const earthHalo = new THREE.Mesh(new THREE.SphereGeometry(56.5, 36, 28), haloMat);
-    this.earthGroup.add(earthHalo);
-    this.spaceSceneGroup.add(this.earthGroup);
-
-    // 3. Spectacular 3D Planet Mars (With Canyons, Volcanic Plateaus & Ice Caps)
-    this.marsGroup = new THREE.Group();
-    this.marsGroup.position.set(0, 45, 160);
-
-    const marsCanvas = document.createElement('canvas');
-    marsCanvas.width = 1024;
-    marsCanvas.height = 512;
-    const mCtx = marsCanvas.getContext('2d');
-
-    // Rich volcanic rust base
-    const mGrad = mCtx.createLinearGradient(0, 0, 0, 512);
-    mGrad.addColorStop(0.0, '#752b14');
-    mGrad.addColorStop(0.5, '#b34720');
-    mGrad.addColorStop(1.0, '#662310');
-    mCtx.fillStyle = mGrad;
-    mCtx.fillRect(0, 0, 1024, 512);
-
-    // Dark basalt plains (Acidalia, Syrtis Major)
-    mCtx.fillStyle = '#42170d';
-    mCtx.beginPath();
-    mCtx.ellipse(320, 220, 140, 95, 0.2, 0, Math.PI * 2);
-    mCtx.ellipse(720, 260, 160, 110, -0.3, 0, Math.PI * 2);
-    mCtx.fill();
-
-    // Valles Marineris canyon cut
-    mCtx.strokeStyle = '#2d0f07';
-    mCtx.lineWidth = 14;
-    mCtx.beginPath();
-    mCtx.moveTo(400, 290);
-    mCtx.lineTo(650, 310);
-    mCtx.stroke();
-
-    // Olympus Mons caldera ring
-    mCtx.fillStyle = '#7a2d16';
-    mCtx.beginPath();
-    mCtx.arc(280, 240, 38, 0, Math.PI * 2);
-    mCtx.fill();
-
-    // Polar ice caps (frozen CO2 & H2O)
-    mCtx.fillStyle = '#f0f5fa';
-    mCtx.fillRect(0, 0, 1024, 28);
-    mCtx.fillRect(0, 484, 1024, 28);
-
-    const marsTex = new THREE.CanvasTexture(marsCanvas);
-    const marsMat = new THREE.MeshStandardMaterial({
-      map: marsTex,
-      roughness: 0.85,
-      metalness: 0.08
-    });
-    this.marsMesh = new THREE.Mesh(new THREE.SphereGeometry(44, 48, 36), marsMat);
-    this.marsGroup.add(this.marsMesh);
-
-    // Mars atmospheric limb halo
-    const marsHalo = new THREE.Mesh(new THREE.SphereGeometry(47.2, 36, 28), new THREE.MeshBasicMaterial({
-      color: 0xd95f2a,
-      transparent: true,
-      opacity: 0.25,
-      side: THREE.BackSide,
-      blending: THREE.AdditiveBlending
-    }));
-    this.marsGroup.add(marsHalo);
-    this.spaceSceneGroup.add(this.marsGroup);
-
-    // 4. THE GIANT MYSTERIOUS ALIEN TENTACLE
-    this.buildGiantTentacle();
-
-    this.scene.add(this.spaceSceneGroup);
-  }
-
-  // ==========================================
-  // THE COLOSSAL MYSTERIOUS ALIEN TENTACLE
-  // ==========================================
-  buildGiantTentacle() {
-    this.tentacleGroup = new THREE.Group();
-    this.tentacleGroup.position.set(0, 18, 0);
-    this.tentacleGroup.visible = false;
-
-    // Organic alien flesh material
-    const skinCanvas = document.createElement('canvas');
-    skinCanvas.width = 256;
-    skinCanvas.height = 256;
-    const sCtx = skinCanvas.getContext('2d');
-    sCtx.fillStyle = '#260a1c'; // Deep extraterrestrial maroon
-    sCtx.fillRect(0, 0, 256, 256);
-    // Mottled alien scales
-    for (let i = 0; i < 400; i++) {
-      sCtx.fillStyle = Math.random() > 0.5 ? '#3d112d' : '#190613';
-      sCtx.beginPath();
-      sCtx.arc(Math.random() * 256, Math.random() * 256, Math.random() * 6 + 2, 0, Math.PI * 2);
-      sCtx.fill();
-    }
-    const skinTex = new THREE.CanvasTexture(skinCanvas);
-    skinTex.wrapS = THREE.RepeatWrapping;
-    skinTex.wrapT = THREE.RepeatWrapping;
-
-    const tentacleMat = new THREE.MeshStandardMaterial({
-      map: skinTex,
-      color: 0x481232,
-      roughness: 0.28,
-      metalness: 0.35
-    });
-
-    const suctionMat = new THREE.MeshStandardMaterial({
-      color: 0x82225a,
-      roughness: 0.2,
-      metalness: 0.4
-    });
-
-    const veinMat = new THREE.MeshBasicMaterial({
-      color: 0x00ffaa, // Pulsating bioluminescent veins
-      transparent: true,
-      opacity: 0.85
-    });
-
-    // 18 Articulated Kinematic Segments chained together
-    this.tentacleSegments = [];
-    const numSegments = 18;
-    let prevGroup = this.tentacleGroup;
-
-    for (let i = 0; i < numSegments; i++) {
-      const p = i / numSegments;
-      const segGroup = new THREE.Group();
-      const segRadius = THREE.MathUtils.lerp(4.2, 0.45, p);
-      const segHeight = 2.4;
-
-      const segMesh = new THREE.Mesh(new THREE.CylinderGeometry(segRadius * 0.88, segRadius, segHeight, 20), tentacleMat);
-      segMesh.position.y = segHeight * 0.5;
-      segMesh.castShadow = true;
-      segGroup.add(segMesh);
-
-      // Suction cups along inner gripping curve
-      [-0.4, 0.4].forEach(off => {
-        const cup = new THREE.Mesh(new THREE.TorusGeometry(segRadius * 0.28, 0.08, 8, 16), suctionMat);
-        cup.rotation.y = Math.PI / 2;
-        cup.position.set(segRadius * 0.95, segHeight * 0.5, off * segRadius * 0.4);
-        segGroup.add(cup);
-      });
-
-      // Bioluminescent vein streak
-      const vein = new THREE.Mesh(new THREE.BoxGeometry(0.08, segHeight * 0.8, 0.15), veinMat);
-      vein.position.set(-segRadius * 0.96, segHeight * 0.5, 0);
-      segGroup.add(vein);
-
-      if (i === 0) {
-        segGroup.position.set(0, -18, 0);
-      } else {
-        segGroup.position.set(0, segHeight, 0);
-      }
-
-      prevGroup.add(segGroup);
-      this.tentacleSegments.push(segGroup);
-      prevGroup = segGroup;
-    }
-
-    this.spaceSceneGroup.add(this.tentacleGroup);
-  }
-
-  // ==========================================
-  // PROLOGUE: CINEMATIC SPACEX ROCKET LAUNCH & MARS LANDING
-  // ==========================================
-  startEarthLaunchPrologue(onComplete) {
-    this.isPrologueActive = true;
-    this.prologueTime = 0;
-    this.prologuePhase = 0;
-    this.prologueCallback = onComplete;
-    window.gameState.inCutscene = true;
-
-    if (document.exitPointerLock) document.exitPointerLock();
-    if (this.viewModel) this.viewModel.visible = false;
-
-    const overlay = document.getElementById('rocket-cliffhanger-overlay');
-    if (overlay) overlay.classList.remove('hidden');
-
-    const blackout = document.getElementById('cliffhanger-blackout');
-    if (blackout) blackout.classList.remove('visible');
-
-    // Reset rocket stack
-    if (this.rocketStack) {
-      this.rocketStack.position.set(0, 4.8, 0);
-      this.rocketStack.rotation.set(0, 0, 0);
-    }
-    if (this.superHeavyBooster) this.superHeavyBooster.position.set(0, 0, 0);
-    if (this.spacexStarship) this.spacexStarship.position.set(0, 49, 0);
-
-    this.engineFlames.forEach(f => f.visible = false);
-    if (this.rocketPointLight) this.rocketPointLight.intensity = 0;
-    if (this.launchSmokeParticles) this.launchSmokeParticles.material.opacity = 0;
-    if (this.spaceSceneGroup) this.spaceSceneGroup.visible = false;
-    if (this.tentacleGroup) this.tentacleGroup.visible = false;
-
-    // Earth sunrise sky
-    this.scene.background.setHex(0x1a3b5c);
-    this.scene.fog.color.setHex(0x22486a);
-    if (this.skyDome) this.skyDome.visible = false;
-
-    if (window.soundSystem) {
-      window.soundSystem.setWindStorm(false);
-      window.soundSystem.playRocketPreIgnition();
-      if (window.soundSystem.playRadioComms) window.soundSystem.playRadioComms();
-    }
-  }
-
-  updatePrologue(delta) {
-    this.prologueTime += delta;
-    const t = this.prologueTime;
-    const px = -85, pz = -85;
-
-    const hudStatus = document.getElementById('launch-telemetry-status');
-    const hudPhase = document.getElementById('launch-seq-phase');
-    const camBadge = document.getElementById('cinematic-cam-badge');
-    const subtitles = document.getElementById('cinematic-dialogue-subtitles');
-
-    if (this.earthMesh) this.earthMesh.rotation.y += 0.001 * delta;
-    if (this.earthClouds) this.earthClouds.rotation.y += 0.002 * delta;
-    if (this.marsMesh) this.marsMesh.rotation.y += 0.0014 * delta;
-
-    // STEP 1: Launch Pad at Dawn & Mission Control Countdown (0.0s - 7.0s)
-    if (t < 7.0) {
-      const p = t / 7.0;
-      const camX = THREE.MathUtils.lerp(-45, -68, p);
-      const camY = THREE.MathUtils.lerp(18, 14, p);
-      const camZ = THREE.MathUtils.lerp(-45, -72, p);
-      this.camera.position.set(camX, camY, camZ);
-      this.camera.lookAt(px, 32, pz);
-
-      if (camBadge) camBadge.textContent = "📹 CAM 01 // KENNEDY LAUNCH COMPLEX 39A";
-      if (hudPhase) hudPhase.textContent = "SPACEX-INSPIRED STARSHIP // FLIGHT READY";
-      const sec = Math.max(0, Math.ceil(7.0 - t));
-      if (hudStatus) hudStatus.textContent = `T-MINUS 00:0${sec} // DSN CARRIER LOCKED`;
-      if (subtitles) subtitles.textContent = "Mission Control: \"Carrier lock confirmed. All 33 Raptor propulsion chill circuits nominal.\"";
-
-      if (this.cryoVaporParticles) {
-        this.cryoVaporParticles.rotation.y += 0.6 * delta;
-      }
-
-      if (window.soundSystem && Math.floor(t * 1.5) !== Math.floor((t - delta) * 1.5)) {
-        window.soundSystem.playCountdownBeep(sec <= 3);
-      }
-    }
-    // STEP 2: Raptor Ignition & Lift-off (7.0s - 14.0s)
-    else if (t < 14.0) {
-      if (this.prologuePhase < 1) {
-        this.prologuePhase = 1;
-        if (window.soundSystem) {
-          window.soundSystem.playRocketIgnition();
-          window.soundSystem.startRocketRoar();
-          window.soundSystem.updateRocketRoar(0.9, 1400);
-        }
-      }
-
-      this.engineFlames.forEach(f => f.visible = true);
-      if (this.rocketPointLight) this.rocketPointLight.intensity = 9.5;
-
-      // Billowing smoke
-      if (this.launchSmokeParticles) {
-        this.launchSmokeParticles.material.opacity = Math.min(0.85, (t - 7.0) * 0.35);
-        const pos = this.launchSmokeParticles.geometry.attributes.position.array;
-        const vel = this.smokeVelocities;
-        for (let i = 0; i < 850; i++) {
-          pos[i * 3] += vel[i * 3] * delta;
-          pos[i * 3 + 1] += vel[i * 3 + 1] * delta;
-          pos[i * 3 + 2] += vel[i * 3 + 2] * delta;
-        }
-        this.launchSmokeParticles.geometry.attributes.position.needsUpdate = true;
-      }
-
-      const liftP = Math.max(0, (t - 9.0) / 5.0);
-      const liftY = 4.8 + Math.pow(liftP, 2.2) * 45;
-      if (this.rocketStack) this.rocketStack.position.y = liftY;
-
-      // Heavy ground camera rumble
-      const shake = Math.sin(t * 60) * 0.12;
-      this.camera.position.set(-62 + shake, 15 + liftP * 8, -66 + shake);
-      this.camera.lookAt(px, liftY * 0.6 + 18, pz);
-
-      if (camBadge) camBadge.textContent = "📹 CAM 02 // MECHAZILLA TOWER GANTRY";
-      if (hudPhase) hudPhase.textContent = "RAPTOR IGNITION // 34,000 kN THRUST ENGAGED";
-      if (hudStatus) hudStatus.textContent = "LIFTOFF! WE HAVE LIFTOFF OF THE ARES EXPEDITION!";
-      if (subtitles) subtitles.textContent = "Mission Control: \"Tower clearance confirmed. Hold-down clamps released. Godspeed Ares-Venture!\"";
-    }
-    // STEP 3: Ascent & Transition to Space (14.0s - 21.0s)
-    else if (t < 21.0) {
-      const ascP = (t - 14.0) / 7.0;
-      const ascY = 49.8 + Math.pow(ascP * 7.0, 2.3) * 14;
-      if (this.rocketStack) {
-        this.rocketStack.position.y = ascY;
-        this.rocketStack.rotation.z = Math.min(0.5, ascP * 0.5);
-      }
-
-      // Tracking camera looking up into the stratosphere
-      this.camera.position.set(-42, 22 + ascP * 12, -42);
-      this.camera.lookAt(px, Math.min(ascY, 400), pz);
-
-      // Deepening sky into cosmic black
-      const darkP = Math.min(1.0, ascP * 1.2);
-      const r = THREE.MathUtils.lerp(0.1, 0.01, darkP);
-      const g = THREE.MathUtils.lerp(0.2, 0.01, darkP);
-      const b = THREE.MathUtils.lerp(0.35, 0.02, darkP);
-      this.scene.background.setRGB(r, g, b);
-      this.scene.fog.color.setRGB(r, g, b);
-
-      if (camBadge) camBadge.textContent = "📹 CAM 03 // UPPER STRATOSPHERE TRACKING";
-      if (hudPhase) hudPhase.textContent = "MAX-Q TRANSONIC PENETRATION // LEAVING EARTH ATMOSPHERE";
-      if (hudStatus) hudStatus.textContent = "ALTITUDE: 65,000 METERS // HEADING TO MARS ORBIT";
-      if (subtitles) subtitles.textContent = "Mission Control: \"Max-Q passed. Trajectory nominal. Staging sequence in 3... 2... 1...\"";
-    }
-    // STEP 4: Deep Space Cruise (21.0s - 28.0s)
-    else if (t < 28.0) {
-      if (this.spaceSceneGroup) this.spaceSceneGroup.visible = true;
-
-      if (this.prologuePhase < 2) {
-        this.prologuePhase = 2;
-        if (window.soundSystem) {
-          window.soundSystem.stopRocketRoar(0.5);
-          if (window.soundSystem.startSpaceAmbience) window.soundSystem.startSpaceAmbience();
-        }
-      }
-
-      // Hide booster, Starship upper stage continues into space
-      if (this.superHeavyBooster) this.superHeavyBooster.visible = false;
-      this.engineFlames.forEach((f, idx) => {
-        // Only subtle vacuum raptor glow
-        f.visible = (idx >= 3);
-      });
-
-      const spaceTime = t - 21.0;
-      const targetY = 620;
-      if (this.rocketStack) {
-        this.rocketStack.position.set(px, targetY, pz);
-        this.rocketStack.rotation.set(0, spaceTime * 0.04, 0.35);
-      }
-
-      // Camera glides past Starship showing Earth receding and Mars ahead
-      const camP = spaceTime / 7.0;
-      this.camera.position.set(px + 28 - camP * 14, targetY + 6, pz + 24 - camP * 20);
-      this.camera.lookAt(px, targetY, pz);
-
-      if (this.earthGroup) {
-        this.earthGroup.position.set(px - 140 - camP * 80, targetY - 40, pz - 180 - camP * 90);
-        this.earthGroup.scale.setScalar(Math.max(0.3, 1.0 - camP * 0.5));
-      }
-      if (this.marsGroup) {
-        this.marsGroup.position.set(px + 120 - camP * 50, targetY + 20, pz + 160 - camP * 60);
-        this.marsGroup.scale.setScalar(0.4 + camP * 0.5);
-      }
-
-      if (camBadge) camBadge.textContent = "📹 CAM 04 // DEEP SPACE INTERPLANETARY CRUISE";
-      if (hudPhase) hudPhase.textContent = "INTERPLANETARY TRANSFER // 54.6 MILLION KM VOYAGE";
-      if (hudStatus) hudStatus.textContent = "DEEP SPACE SILENCE // MARS PROXIMITY APPROACHING";
-      if (subtitles) subtitles.textContent = "Flight Telemetry: \"Silent cosmic transit. Deep Space Network locked. Mars orbital insertion on schedule.\"";
-    }
-    // STEP 5: Atmospheric Entry at Mars (28.0s - 35.0s)
-    else if (t < 35.0) {
-      if (this.prologuePhase < 3) {
-        this.prologuePhase = 3;
-        if (window.soundSystem) {
-          if (window.soundSystem.stopSpaceAmbience) window.soundSystem.stopSpaceAmbience();
-          if (window.soundSystem.playReentryPlasmaRoar) window.soundSystem.playReentryPlasmaRoar();
-        }
-      }
-
-      const reTime = t - 28.0;
-      const p = reTime / 7.0;
-
-      // Fiery plasma glow on heat shield
-      const plasmaR = THREE.MathUtils.lerp(0.01, 0.85, Math.sin(p * Math.PI));
-      const plasmaG = THREE.MathUtils.lerp(0.01, 0.35, Math.sin(p * Math.PI));
-      const plasmaB = THREE.MathUtils.lerp(0.02, 0.12, Math.sin(p * Math.PI));
-      this.scene.background.setRGB(plasmaR, plasmaG, plasmaB);
-      this.scene.fog.color.setRGB(plasmaR, plasmaG, plasmaB);
-
-      // Starship in belly-flop aerodynamic re-entry posture
-      if (this.rocketStack) {
-        this.rocketStack.position.set(px, 320 - p * 240, pz);
-        this.rocketStack.rotation.set(Math.PI * 0.45, 0, Math.sin(t * 12) * 0.04);
-      }
-
-      // Aerodynamic flap trimming
-      this.aerodynamicFlaps.forEach((flap, idx) => {
-        flap.rotation.x = Math.sin(t * 8 + idx) * 0.25;
-      });
-
-      const entryShake = Math.sin(t * 45) * 0.08;
-      this.camera.position.set(px - 18 + entryShake, 322 - p * 240 + entryShake, pz + 16);
-      this.camera.lookAt(px, 320 - p * 240, pz);
-
-      if (camBadge) camBadge.textContent = "📹 CAM 05 // MARTIAN RE-ENTRY PLASMA SHEATH";
-      if (hudPhase) hudPhase.textContent = "HYPERSONIC ENTRY // CERAMIC HEAT SHIELD: 1,600°C";
-      if (hudStatus) hudStatus.textContent = "ATMOSPHERIC DECELERATION // BELLY-FLOP AERODYNAMIC TRIM";
-      if (subtitles) subtitles.textContent = "Automated Nav: \"Entry interface verified. Plasma ionization peak. Preparing landing flip maneuver.\"";
-    }
-    // STEP 6: Retro-Propulsion Landing Burn & Touchdown on Mars (35.0s - 43.0s)
-    else if (t < 43.0) {
-      if (this.prologuePhase < 4) {
-        this.prologuePhase = 4;
-        if (this.spaceSceneGroup) this.spaceSceneGroup.visible = false;
-        if (this.skyDome) this.skyDome.visible = true;
-
-        // Reset to Mars daylight atmosphere
-        this.scene.background.setHex(0xd25b2a);
-        this.scene.fog.color.setHex(0xc85b2e);
-
-        if (window.soundSystem) {
-          if (window.soundSystem.playRetroLandingBurn) window.soundSystem.playRetroLandingBurn();
-        }
-      }
-
-      const landP = (t - 35.0) / 8.0;
-      const landY = 80 - Math.pow(landP, 1.4) * 75.2;
-
-      // Rocket flips to vertical landing orientation
-      if (this.rocketStack) {
-        this.rocketStack.position.set(-18, Math.max(4.8, landY), -12);
-        this.rocketStack.rotation.set(0, 0, 0);
-      }
-
-      // Starship landing thrusters firing
-      this.shipNozzles.forEach(noz => {
-        if (noz.children[0]) noz.children[0].visible = landP < 0.85;
-      });
-
-      // Ground camera at landing site watching descent
-      this.camera.position.set(-8, this.getTerrainHeight(-8, 6) + 2.0, 6);
-      this.camera.lookAt(-18, Math.max(4.8, landY) + 6, -12);
-
-      if (camBadge) camBadge.textContent = "📹 CAM 06 // ACIDALIA PLANITIA LANDING ZONE";
-      if (hudPhase) hudPhase.textContent = "RETRO-PROPULSION LANDING BURN // FINAL TOUCHDOWN";
-      if (hudStatus) hudStatus.textContent = landP >= 0.85 ? "TOUCHDOWN CONFIRMED // ENGINES CUTOFF // WELCOME TO MARS!" : "DESCENDING // RETRO THRUST 100% // RADAR ALTIMETER LOCKED";
-      if (subtitles) subtitles.textContent = landP >= 0.85 ?
-        "Automated Telemetry: \"Contact light! Touchdown confirmed. Pressurization sealed. You have arrived on Mars.\"" :
-        "Automated Nav: \"Altitude 40 meters. Vertical descent velocity 1.8 m/s. Landing gear deployed.\"";
-    }
-    // STEP 7: Seamless Transition to Mars Surface Gameplay (43.0s+)
-    else {
-      this.completePrologue();
-    }
-  }
-
-  completePrologue() {
-    this.isPrologueActive = false;
-    window.gameState.inCutscene = false;
-
-    const overlay = document.getElementById('rocket-cliffhanger-overlay');
-    if (overlay) overlay.classList.add('hidden');
-
-    // Restore Mars daylight scene
-    this.scene.background.setHex(0xd25b2a);
-    this.scene.fog.color.setHex(0xc85b2e);
-    if (this.skyDome) this.skyDome.visible = true;
-    if (this.spaceSceneGroup) this.spaceSceneGroup.visible = false;
-    if (this.viewModel) this.viewModel.visible = true;
-
-    // Reset rocket stack to landing pad
-    if (this.rocketStack) {
-      this.rocketStack.position.set(0, 4.8, 0);
-      this.rocketStack.rotation.set(0, 0, 0);
-    }
-    if (this.superHeavyBooster) this.superHeavyBooster.visible = true;
-    this.engineFlames.forEach(f => f.visible = false);
-
-    if (window.soundSystem) {
-      window.soundSystem.stopRocketRoar(0.1);
-    }
-
-    if (this.prologueCallback) {
-      this.prologueCallback();
-      this.prologueCallback = null;
-    }
-  }
-
-  // ==========================================
-  // FINAL SPACESHIP ESCAPE & TENTACLE CLIFFHANGER
-  // ==========================================
-  startSpaceshipEscapeCliffhanger() {
-    this.isEscapeActive = true;
-    this.escapeTime = 0;
-    this.escapePhase = 0;
-    window.gameState.inCutscene = true;
-
-    if (document.exitPointerLock) document.exitPointerLock();
-    if (this.viewModel) this.viewModel.visible = false;
-
-    const overlay = document.getElementById('rocket-cliffhanger-overlay');
-    if (overlay) overlay.classList.remove('hidden');
-
-    const blackout = document.getElementById('cliffhanger-blackout');
-    if (blackout) blackout.classList.remove('visible');
-
-    // Position Starship for liftoff from Mars landing site
-    const lx = -18, lz = -12;
-    if (this.spacexStarship) {
-      this.spacexStarship.position.set(lx, 4.8, lz);
-      this.spacexStarship.rotation.set(0, 0, 0);
-    }
-    if (this.superHeavyBooster) this.superHeavyBooster.visible = false;
-
-    this.shipNozzles.forEach(noz => {
-      if (noz.children[0]) noz.children[0].visible = false;
-    });
-
-    if (this.spaceSceneGroup) this.spaceSceneGroup.visible = false;
-    if (this.tentacleGroup) this.tentacleGroup.visible = false;
-    if (this.cockpitRedAlertLight) this.cockpitRedAlertLight.intensity = 0;
-
-    if (window.soundSystem) {
-      window.soundSystem.setWindStorm(false);
-      if (window.soundSystem.playCockpitBoot) window.soundSystem.playCockpitBoot();
-      if (window.soundSystem.playRaptorIgnition) window.soundSystem.playRaptorIgnition();
-    }
-  }
-
-  updateSpaceshipEscape(delta) {
-    this.escapeTime += delta;
-    const t = this.escapeTime;
-
-    const hudStatus = document.getElementById('launch-telemetry-status');
-    const hudPhase = document.getElementById('launch-seq-phase');
-    const camBadge = document.getElementById('cinematic-cam-badge');
-    const subtitles = document.getElementById('cinematic-dialogue-subtitles');
-
-    if (this.marsMesh) this.marsMesh.rotation.y += 0.0015 * delta;
-    if (this.earthMesh) this.earthMesh.rotation.y += 0.001 * delta;
-
-    // SCENE 1: The Escape — Liftoff from Mars (0.0s - 8.0s)
-    if (t < 8.0) {
-      const p = t / 8.0;
-      const ascY = 4.8 + Math.pow(p * 8.0, 2.2) * 8.5;
-
-      if (this.spacexStarship) {
-        this.spacexStarship.position.y = ascY;
-      }
-      this.shipNozzles.forEach(noz => {
-        if (noz.children[0]) noz.children[0].visible = true;
-      });
-
-      // Camera watching Starship rise from Mars plains
-      this.camera.position.set(-6, this.getTerrainHeight(-6, 8) + 3.0 + p * 12, 8);
-      this.camera.lookAt(-18, ascY * 0.7 + 6, -12);
-
-      if (camBadge) camBadge.textContent = "📹 CAM 01 // ARES STARSHIP ASCENT";
-      if (hudPhase) hudPhase.textContent = "MARS ESCAPE TRAJECTORY // RAPTOR PROPULSION NOMINAL";
-      if (hudStatus) hudStatus.textContent = "LIFTOFF! RETURNING TO EARTH // 104% RATED THRUST";
-      if (subtitles) subtitles.textContent = "Commander Reyes: \"Ascent engines locked. Breaking Mars gravity well. We're going home!\"";
-    }
-    // SCENE 2: Leaving Mars & Triumph (8.0s - 16.0s)
-    else if (t < 16.0) {
-      if (this.spaceSceneGroup) this.spaceSceneGroup.visible = true;
-
-      if (this.escapePhase < 1) {
-        this.escapePhase = 1;
-        if (window.soundSystem) {
-          window.soundSystem.updateRocketRoar(0.3, 200);
-          window.soundSystem.playEpicCliffhangerMusic();
-        }
-      }
-
-      const spaceTime = t - 8.0;
-      const p = spaceTime / 8.0;
-
-      // Spacecraft positioned in deep space heading towards Earth
-      if (this.spacexStarship) {
-        this.spacexStarship.position.set(0, 620, 0);
-        this.spacexStarship.rotation.set(0.2, 0, Math.sin(t * 0.5) * 0.05);
-      }
-
-      // Mars shrinking into the background, Earth visible in distance
-      if (this.marsGroup) {
-        this.marsGroup.position.set(0, 580, 140 + p * 120);
-        this.marsGroup.scale.setScalar(Math.max(0.25, 0.9 - p * 0.5));
-      }
-      if (this.earthGroup) {
-        this.earthGroup.position.set(0, 640, -160 + p * 20);
-        this.earthGroup.scale.setScalar(0.7 + p * 0.2);
-      }
-
-      // Majestic gliding cinematic camera
-      this.camera.position.set(18 - p * 10, 624 + Math.sin(p * Math.PI) * 4, 18 - p * 8);
-      this.camera.lookAt(0, 620, 0);
-
-      if (camBadge) camBadge.textContent = "📹 CAM 02 // EARTH RETURN TRANSFER TRAJECTORY";
-      if (hudPhase) hudPhase.textContent = "MARTIAN ORBIT ESCAPED // INTERPLANETARY CRUISE";
-      if (hudStatus) hudStatus.textContent = "COURSE: HOME // YOU HAVE SURVIVED THE RED PLANET";
-      if (subtitles) subtitles.textContent = "Commander Reyes: \"Telemetry confirmed. Mars is behind us. Survival mission accomplished.\"";
-    }
-    // SCENE 3: The Mysterious Creature Strikes! (16.0s - 25.0s)
-    else if (t < 25.0) {
-      if (this.escapePhase < 2) {
-        this.escapePhase = 2;
-        if (this.tentacleGroup) this.tentacleGroup.visible = true;
-
-        if (window.soundSystem) {
-          window.soundSystem.stopEpicCliffhangerMusic();
-          if (window.soundSystem.playTentacleEmergence) window.soundSystem.playTentacleEmergence();
-          if (window.soundSystem.playEmergencyAlarm) window.soundSystem.playEmergencyAlarm(true);
-        }
-      }
-
-      const strikeTime = t - 16.0;
-      const sP = strikeTime / 9.0;
-
-      // Flash cockpit red alert strobe
-      if (this.cockpitRedAlertLight) {
-        this.cockpitRedAlertLight.intensity = Math.sin(t * 18) > 0 ? 3.5 : 0;
-      }
-
-      // Tentacle curls and violently constricts around the Starship
-      if (this.tentacleSegments.length > 0) {
-        this.tentacleSegments.forEach((seg, idx) => {
-          const curlFactor = THREE.MathUtils.lerp(0.02, 0.22, Math.min(1.0, sP * 1.5));
-          seg.rotation.z = Math.sin(strikeTime * 3.5 + idx * 0.4) * curlFactor;
-          seg.rotation.x = Math.cos(strikeTime * 2.8 + idx * 0.35) * (curlFactor * 0.8);
-        });
-      }
-
-      // Spaceship violent vibration and off-course tilt under tentacle crushing force
-      if (this.spacexStarship) {
-        const shudder = Math.sin(t * 35) * 0.25;
-        this.spacexStarship.position.set(shudder, 620 - sP * 25, shudder * 0.8);
-        this.spacexStarship.rotation.set(0.2 + sP * 0.6, shudder * 0.4, -sP * 0.8);
-      }
-
-      if (strikeTime >= 2.2 && this.escapePhase < 3) {
-        this.escapePhase = 3;
-        if (window.soundSystem) {
-          if (window.soundSystem.playTentacleSlam) window.soundSystem.playTentacleSlam();
-          if (window.soundSystem.playTentacleConstrict) window.soundSystem.playTentacleConstrict();
-          if (window.soundSystem.playTentacleCliffhangerMusic) window.soundSystem.playTentacleCliffhangerMusic();
-        }
-      }
-
-      // Violent alternating camera cuts between exterior grip and shaking cockpit
-      const isCockpitCut = Math.sin(t * 5) > 0.2;
-      if (isCockpitCut) {
-        // Cockpit interior view
-        this.camera.position.set(0, 642 - sP * 25, 2.2);
-        this.camera.lookAt(0, 642 - sP * 25, 4.0);
-        if (camBadge) camBadge.textContent = "⚠️ CAM 03 // COCKPIT ALARM OVERRIDE";
-      } else {
-        // Exterior horrifying close-up of tentacle wrapped around hull
-        const extShake = Math.sin(t * 50) * 0.35;
-        this.camera.position.set(12 + extShake, 624 - sP * 25 + extShake, -10);
-        this.camera.lookAt(0, 620 - sP * 25, 0);
-        if (camBadge) camBadge.textContent = "⚠️ CAM 04 // EXTERIOR STRUCTURAL FAILURE";
-      }
-
-      if (hudPhase) hudPhase.textContent = "⚠️ UNIDENTIFIED MASS DETECTED // STRUCTURAL CRUSHING";
-      if (hudStatus) hudStatus.textContent = "HULL BREACH IMMINENT! BEING PULLED DOWN! MAYDAY!";
-      if (subtitles) subtitles.textContent = "Commander Reyes: \"WHAT IS THAT?! SOMETHING'S GOT THE SHIP! THE HULL IS BUCKLING— MAYDAY! MAYD—\"";
-    }
-    // SCENE 4: The Cliffhanger Blackout (25.0s+)
-    else {
-      if (this.escapePhase < 4) {
-        this.escapePhase = 4;
-        if (window.soundSystem) {
-          window.soundSystem.stopRocketRoar(0.01);
-          if (window.soundSystem.stopEmergencyAlarm) window.soundSystem.stopEmergencyAlarm();
-        }
-
-        const blackout = document.getElementById('cliffhanger-blackout');
-        if (blackout) {
-          blackout.classList.add('visible');
-        }
-      }
-    }
-  }
-
-  // ==========================================
-  // SKIP CINEMATIC CONTROLLER
-  // ==========================================
-  skipCinematic() {
-    if (this.isPrologueActive) {
-      this.completePrologue();
-    } else if (this.isEscapeActive || this.isCliffhangerActive) {
-      if (window.soundSystem) {
-        window.soundSystem.stopRocketRoar(0.05);
-        if (window.soundSystem.stopEmergencyAlarm) window.soundSystem.stopEmergencyAlarm();
-      }
-      const blackout = document.getElementById('cliffhanger-blackout');
-      if (blackout) blackout.classList.add('visible');
-    }
-  }
-
-  // Backward compatibility alias
-  startRocketLaunchCliffhanger() {
-    this.startSpaceshipEscapeCliffhanger();
-  }
-
-  resetFromCliffhanger() {
-    this.isCliffhangerActive = false;
-    this.isEscapeActive = false;
-    this.isPrologueActive = false;
-    window.gameState.inCutscene = false;
-
-    if (this.viewModel) this.viewModel.visible = true;
-
-    this.scene.background.setHex(0xd25b2a);
-    this.scene.fog.color.setHex(0xc85b2e);
-    if (this.skyDome) this.skyDome.visible = true;
-
-    if (this.rocketStack) {
-      this.rocketStack.position.set(0, 4.8, 0);
-      this.rocketStack.rotation.set(0, 0, 0);
-    }
-    if (this.spacexStarship) {
-      this.spacexStarship.position.set(0, 49, 0);
-      this.spacexStarship.rotation.set(0, 0, 0);
-    }
-    if (this.superHeavyBooster) this.superHeavyBooster.visible = true;
-    this.engineFlames.forEach(f => f.visible = false);
-    if (this.rocketPointLight) this.rocketPointLight.intensity = 0;
-    if (this.spaceSceneGroup) this.spaceSceneGroup.visible = false;
-    if (this.tentacleGroup) this.tentacleGroup.visible = false;
-  }
-
-  updateEnvironmentAnimations(delta) {
-    if (this.cloudDome) {
-      this.cloudDome.rotation.y += 0.0003 * delta;
-    }
-
-    if (this.astronautsGroup && this.astronautsGroup.children.length > 0) {
-      const time = this.clock ? this.clock.getElapsedTime() : 0;
-      this.astronautsGroup.children.forEach((astro, idx) => {
-        astro.rotation.y += Math.sin(time * 0.8 + idx) * 0.0008;
-      });
-    }
-
-    if (this.cryoVaporParticles && !this.isCliffhangerActive) {
-      this.cryoVaporParticles.rotation.y += 0.4 * delta;
-    }
   }
 
   // ==========================================
@@ -2790,11 +1237,6 @@ class GameEngine3D {
     this.buildRelayRidge();
     this.buildMaintenanceRover(missionId === 4);
 
-    // Ensure persistent Mars research colony, astronauts and rocket launch complex
-    if (!this.colonyGroup || !this.colonyGroup.parent) this.buildColonyComplex();
-    if (!this.astronautsGroup || !this.astronautsGroup.parent) this.buildAstronautExplorers();
-    if (!this.rocketComplex || !this.rocketComplex.parent) this.buildRocketLaunchComplex();
-
     this.applyMissionAtmosphere(missionId);
     this.spawnMissionItems(missionId);
   }
@@ -2802,31 +1244,32 @@ class GameEngine3D {
   applyMissionAtmosphere(missionId) {
     if (missionId === 4) {
       this.isStormActive = true;
-      this.scene.fog.color.setHex(0x732912);
-      this.scene.fog.density = 0.045;
-      this.scene.background.setHex(0x732912);
-      this.ambientLight.color.setHex(0xaa4422);
-      this.ambientLight.intensity = 0.5;
+      this.scene.fog.color.setHex(0x140604);
+      this.scene.fog.density = 0.035;
+      this.scene.background.setHex(0x060202); // Deep black storm sky
+      this.ambientLight.color.setHex(0x662211);
+      this.ambientLight.intensity = 0.4;
       this.sunLight.intensity = 0.3;
     } else if (missionId === 5) {
       this.isStormActive = false;
-      this.scene.fog.color.setHex(0x2a1420);
-      this.scene.fog.density = 0.012;
-      this.scene.background.setHex(0x1a0a14);
-      this.ambientLight.color.setHex(0x553344);
-      this.ambientLight.intensity = 0.45;
+      this.scene.fog.color.setHex(0x04060e);
+      this.scene.fog.density = 0.0035;
+      this.scene.background.setHex(0x02040c); // Deep solid black space sky
+      this.ambientLight.color.setHex(0x4a2422);
+      this.ambientLight.intensity = 0.5;
       this.sunLight.color.setHex(0xdd6644);
-      this.sunLight.intensity = 0.6;
+      this.sunLight.intensity = 0.7;
       this.sunLight.position.set(-150, 20, 80);
     } else {
       this.isStormActive = false;
-      this.scene.fog.color.setHex(0xc85b2e);
-      this.scene.fog.density = 0.0095;
-      this.scene.background.setHex(0xd25b2a);
-      this.ambientLight.color.setHex(0xcc5528);
+      this.scene.fog.color.setHex(0x04060e); // Deep midnight space fog (preserves starfield clarity)
+      this.scene.fog.density = 0.0035; // Subtle dark atmospheric depth
+      this.scene.background.setHex(0x02040c); // Deep solid midnight black space sky (NASA reference)
+      this.ambientLight.color.setHex(0x753b23); // Calibrated warm Martian soil bounce
       this.ambientLight.intensity = 0.65;
-      this.sunLight.intensity = 1.6;
-      this.sunLight.position.set(160, 95, -120);
+      this.sunLight.intensity = 1.35;
+      this.sunLight.color.setHex(0xffeedd);
+      this.sunLight.position.set(120, 160, 90);
     }
   }
 
@@ -2835,106 +1278,145 @@ class GameEngine3D {
     const cx = -18, cz = -12;
     const cy = this.getTerrainHeight(cx, cz);
 
-    const steelMat = new THREE.MeshStandardMaterial({ color: 0xe6ecf2, metalness: 0.95, roughness: 0.16 });
-    const tileMat = new THREE.MeshStandardMaterial({ color: 0x141416, metalness: 0.7, roughness: 0.35 });
-    const darkMat = new THREE.MeshStandardMaterial({ color: 0x22242a, metalness: 0.9, roughness: 0.25 });
+    const hullMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.85, roughness: 0.35 });
+    const scorchMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
 
-    // Starship Standing Upright on Mars Landing Legs
-    const shipHeight = 28;
-    const shipRadius = 2.8;
+    const bodyGeo = new THREE.CylinderGeometry(2.4, 2.8, 11, 16);
+    const body = new THREE.Mesh(bodyGeo, hullMat);
+    body.rotation.z = Math.PI / 3.2;
+    body.rotation.x = 0.2;
+    body.position.set(cx, cy + 2.5, cz);
+    body.castShadow = true;
+    body.receiveShadow = true;
+    group.add(body);
 
-    const shipGeo = new THREE.CylinderGeometry(shipRadius, shipRadius, 18, 32);
-    const shipBody = new THREE.Mesh(shipGeo, steelMat);
-    shipBody.position.set(cx, cy + 12, cz);
-    shipBody.castShadow = true;
-    group.add(shipBody);
+    const shieldGeo = new THREE.CylinderGeometry(2.82, 2.85, 2.5, 16);
+    const shield = new THREE.Mesh(shieldGeo, scorchMat);
+    shield.rotation.z = Math.PI / 3.2;
+    shield.position.set(cx - 3.2, cy + 0.8, cz);
+    group.add(shield);
 
-    const heatGeo = new THREE.CylinderGeometry(shipRadius + 0.03, shipRadius + 0.03, 18, 32, 1, false, -Math.PI * 0.5, Math.PI);
-    const heatBody = new THREE.Mesh(heatGeo, tileMat);
-    heatBody.position.set(cx, cy + 12, cz);
-    group.add(heatBody);
-
-    const noseGeo = new THREE.ConeGeometry(shipRadius, 10, 32);
-    const nose = new THREE.Mesh(noseGeo, steelMat);
-    nose.position.set(cx, cy + 26, cz);
-    nose.castShadow = true;
-    group.add(nose);
-
-    // Aerodynamic flaps
-    [-1, 1].forEach(side => {
-      const fGeo = new THREE.BoxGeometry(0.12, 5.0, 2.2);
-      const flap = new THREE.Mesh(fGeo, side < 0 ? tileMat : steelMat);
-      flap.position.set(cx + side * 3.8, cy + 7, cz);
-      group.add(flap);
-    });
-
-    // 6 Hydraulic Landing Leg Struts
-    for (let l = 0; l < 6; l++) {
-      const ang = (l / 6) * Math.PI * 2;
-      const legGroup = new THREE.Group();
-      legGroup.position.set(cx + Math.sin(ang) * 2.6, cy + 3.2, cz + Math.cos(ang) * 2.6);
-      legGroup.rotation.y = ang;
-
-      const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 4.2, 12), darkMat);
-      strut.rotation.z = 0.35;
-      strut.position.set(0.7, -1.8, 0);
-      legGroup.add(strut);
-
-      const footPad = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 0.15, 12), steelMat);
-      footPad.position.set(1.4, -3.2, 0);
-      legGroup.add(footPad);
-      group.add(legGroup);
-    }
-
-    // Boarding Ramp & Crew Airlock
-    const rampGeo = new THREE.BoxGeometry(1.6, 0.15, 6.5);
-    const ramp = new THREE.Mesh(rampGeo, darkMat);
-    ramp.rotation.x = -0.32;
-    ramp.position.set(cx, cy + 1.2, cz + 4.2);
-    group.add(ramp);
-
-    // Departure Escape Console at base of ramp
-    const escapeConsoleGeo = new THREE.BoxGeometry(0.6, 1.2, 0.5);
-    const escapeConsole = new THREE.Mesh(escapeConsoleGeo, new THREE.MeshStandardMaterial({
-      color: 0x00e5ff,
-      emissive: 0x006688,
-      emissiveIntensity: 0.5,
-      metalness: 0.8
-    }));
-    escapeConsole.position.set(cx + 1.8, cy + 0.6, cz + 6.8);
-    group.add(escapeConsole);
+    const strutGeo = new THREE.BoxGeometry(0.3, 7.5, 1.8);
+    const strut = new THREE.Mesh(strutGeo, hullMat);
+    strut.rotation.set(0.4, 0.2, 1.2);
+    strut.position.set(cx + 4.5, cy + 1.2, cz + 2.5);
+    group.add(strut);
 
     this.scene.add(group);
-
-    // Register Escape Departure Console Interaction
-    this.interactables.push({
-      type: 'escape_console',
-      label: '[E] Enter Ares Starship & Initiate Escape',
-      mesh: escapeConsole,
-      x: cx + 1.8,
-      y: cy + 0.6,
-      z: cz + 6.8,
-      callback: () => {
-        if (window.soundSystem) {
-          if (window.soundSystem.playSpaceshipDoor) window.soundSystem.playSpaceshipDoor();
-          else window.soundSystem.playAirlock();
-        }
-        if (window.uiManager) {
-          window.uiManager.showBanner("🚀 BOARDING ARES STARSHIP // PREPARING DEPARTURE...");
-        }
-        setTimeout(() => {
-          this.startSpaceshipEscapeCliffhanger();
-        }, 1200);
-      }
-    });
 
     this.colliders.push({
       type: 'box',
       minX: cx - 5.5,
       maxX: cx + 5.5,
-      minZ: cz - 5.5,
-      maxZ: cz + 7.5
+      minZ: cz - 4.5,
+      maxZ: cz + 4.5
     });
+  }
+
+  // Procedural habitat dome texture (hexagonal panels, weathering, dust)
+  createHabitatTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024; canvas.height = 1024;
+    const ctx = canvas.getContext('2d');
+
+    // Base: aged off-white with subtle yellowing gradient toward base
+    const baseGrad = ctx.createLinearGradient(0, 0, 0, 1024);
+    baseGrad.addColorStop(0.0, '#e9e5dc');
+    baseGrad.addColorStop(0.55, '#dedad0');
+    baseGrad.addColorStop(1.0, '#c8b898');
+    ctx.fillStyle = baseGrad;
+    ctx.fillRect(0, 0, 1024, 1024);
+
+    // Hexagonal panel grid pattern (structural composite, ISS-style)
+    const hexSize = 48, hexH = hexSize * Math.sqrt(3);
+    ctx.strokeStyle = 'rgba(90,80,65,0.38)';
+    ctx.lineWidth = 1.5;
+    for (let row = -1; row < 1024 / hexH + 1; row++) {
+      for (let col = -1; col < 1024 / (hexSize * 1.5) + 1; col++) {
+        const cx2 = col * hexSize * 3 + (row % 2 === 0 ? 0 : hexSize * 1.5);
+        const cy2 = row * hexH;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const angle = Math.PI / 180 * (60 * i - 30);
+          const hpx = cx2 + hexSize * 0.92 * Math.cos(angle);
+          const hpy = cy2 + hexSize * 0.92 * Math.sin(angle);
+          i === 0 ? ctx.moveTo(hpx, hpy) : ctx.lineTo(hpx, hpy);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        // Subtle panel interior shading variation
+        const shade = (Math.random() * 18 - 9) | 0;
+        ctx.fillStyle = `rgba(${128+shade},${120+shade},${105+shade},0.08)`;
+        ctx.fill();
+      }
+    }
+
+    // Rivet dots at panel intersections
+    ctx.fillStyle = 'rgba(60,55,48,0.5)';
+    for (let row = -1; row < 1024 / hexH + 1; row++) {
+      for (let col = -1; col < 1024 / (hexSize * 1.5) + 1; col++) {
+        const cx2 = col * hexSize * 3 + (row % 2 === 0 ? 0 : hexSize * 1.5);
+        const cy2 = row * hexH;
+        for (let i = 0; i < 6; i++) {
+          const angle = Math.PI / 180 * (60 * i - 30);
+          const rpx = cx2 + hexSize * 0.92 * Math.cos(angle);
+          const rpy = cy2 + hexSize * 0.92 * Math.sin(angle);
+          ctx.beginPath(); ctx.arc(rpx, rpy, 2.2, 0, Math.PI*2); ctx.fill();
+        }
+      }
+    }
+
+    // Thermal protection coating marks (darker base from regolith dust accumulation)
+    const dustGrad = ctx.createLinearGradient(0, 600, 0, 1024);
+    dustGrad.addColorStop(0, 'rgba(140,88,42,0)');
+    dustGrad.addColorStop(1, 'rgba(140,88,42,0.42)');
+    ctx.fillStyle = dustGrad;
+    ctx.fillRect(0, 0, 1024, 1024);
+
+    // UV-weathering darkening stripes
+    for (let i = 0; i < 12; i++) {
+      const wx = Math.random() * 1024, ww = 20 + Math.random() * 60;
+      ctx.fillStyle = 'rgba(90,70,50,0.07)';
+      ctx.fillRect(wx, 0, ww, 1024);
+    }
+
+    // Metallic thermal tape strips (horizontal bands)
+    ctx.strokeStyle = 'rgba(200,195,180,0.6)';
+    ctx.lineWidth = 3;
+    for (let band = 0; band < 5; band++) {
+      const by = 180 + band * 170;
+      ctx.beginPath(); ctx.moveTo(0, by); ctx.lineTo(1024, by); ctx.stroke();
+    }
+
+    return new THREE.CanvasTexture(canvas);
+  }
+
+  createHabitatMetalTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512; canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+    // Brushed aluminum base
+    ctx.fillStyle = '#b8b4aa';
+    ctx.fillRect(0, 0, 512, 512);
+    // Horizontal brush strokes
+    for (let i = 0; i < 512; i += 2) {
+      const alpha = 0.03 + Math.random() * 0.06;
+      ctx.fillStyle = `rgba(${200+Math.random()*20|0},${195+Math.random()*20|0},${185+Math.random()*20|0},${alpha})`;
+      ctx.fillRect(0, i, 512, 1);
+    }
+    // Circumferential weld seam lines
+    ctx.strokeStyle = 'rgba(60,55,50,0.45)';
+    ctx.lineWidth = 2;
+    for (let s = 0; s < 512; s += 64) {
+      ctx.beginPath(); ctx.moveTo(0, s); ctx.lineTo(512, s); ctx.stroke();
+    }
+    // Dust accumulation at base
+    const dg = ctx.createLinearGradient(0, 350, 0, 512);
+    dg.addColorStop(0, 'rgba(140,80,30,0)');
+    dg.addColorStop(1, 'rgba(140,80,30,0.38)');
+    ctx.fillStyle = dg;
+    ctx.fillRect(0, 0, 512, 512);
+    return new THREE.CanvasTexture(canvas);
   }
 
   buildHabitatAlpha() {
@@ -2942,41 +1424,253 @@ class GameEngine3D {
     const hx = 0, hz = 25;
     const hy = this.getTerrainHeight(hx, hz);
 
-    const domeMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, metalness: 0.2, roughness: 0.4 });
-    const domeGeo = new THREE.SphereGeometry(11, 24, 18, 0, Math.PI * 2, 0, Math.PI / 2);
+    // =====================================================
+    // PROCEDURAL TEXTURES
+    // =====================================================
+    const habTex = this.createHabitatTexture();
+    habTex.wrapS = habTex.wrapT = THREE.RepeatWrapping;
+    habTex.repeat.set(3, 1.5);
+
+    const metalTex = this.createHabitatMetalTexture();
+    metalTex.wrapS = metalTex.wrapT = THREE.RepeatWrapping;
+    metalTex.repeat.set(2, 1);
+
+    // =====================================================
+    // 1. REGOLITH BLAST-SHIELD FOUNDATION RING
+    // =====================================================
+    const shieldGeo = new THREE.CylinderGeometry(12.2, 12.8, 0.8, 32);
+    const shieldMat = new THREE.MeshStandardMaterial({
+      color: 0x9e5c30, roughness: 0.95, metalness: 0.05
+    });
+    const shield = new THREE.Mesh(shieldGeo, shieldMat);
+    shield.position.set(hx, hy + 0.4, hz);
+    shield.receiveShadow = true;
+    group.add(shield);
+
+    // =====================================================
+    // 2. MAIN DOME (Geodesic hexagonal composite)
+    // =====================================================
+    const domeMat = new THREE.MeshStandardMaterial({
+      map: habTex,
+      color: 0xe8e0d4,
+      metalness: 0.28,
+      roughness: 0.52,
+    });
+    const domeGeo = new THREE.SphereGeometry(11, 36, 28, 0, Math.PI * 2, 0, Math.PI / 2);
     const dome = new THREE.Mesh(domeGeo, domeMat);
     dome.position.set(hx, hy, hz);
     dome.castShadow = true;
     dome.receiveShadow = true;
     group.add(dome);
 
-    const tunnelGeo = new THREE.CylinderGeometry(2.1, 2.1, 6.5, 16);
-    const tunnelMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.5, roughness: 0.5 });
-    const tunnel = new THREE.Mesh(tunnelGeo, tunnelMat);
-    tunnel.rotation.x = Math.PI / 2;
-    tunnel.position.set(hx, hy + 1.9, hz - 11);
-    tunnel.castShadow = true;
-    group.add(tunnel);
+    // Structural horizontal ring bands (3 latitude bands)
+    const ringMat = new THREE.MeshStandardMaterial({
+      color: 0x7a7870, metalness: 0.75, roughness: 0.35
+    });
+    [3.5, 6.5, 9.0].forEach((rh, ri) => {
+      const r = Math.sqrt(11*11 - rh*rh);
+      const ringGeo = new THREE.TorusGeometry(r, 0.18, 8, 48);
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.position.set(hx, hy + rh, hz);
+      ring.castShadow = true;
+      group.add(ring);
+    });
 
-    const doorFrameGeo = new THREE.BoxGeometry(2.8, 3.2, 0.4);
-    const frameMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.8 });
+    // Vertical rib struts (8 around dome)
+    const ribMat = new THREE.MeshStandardMaterial({
+      color: 0x888680, metalness: 0.8, roughness: 0.3
+    });
+    for (let ri = 0; ri < 8; ri++) {
+      const angle = (ri / 8) * Math.PI * 2;
+      const ribLen = 11.5;
+      const ribGeo = new THREE.BoxGeometry(0.22, ribLen, 0.22);
+      const rib = new THREE.Mesh(ribGeo, ribMat);
+      rib.position.set(
+        hx + Math.sin(angle) * 9.0,
+        hy + 5.5,
+        hz + Math.cos(angle) * 9.0
+      );
+      rib.rotation.z = -Math.sin(angle) * 0.52;
+      rib.rotation.x = Math.cos(angle) * 0.52;
+      rib.castShadow = true;
+      group.add(rib);
+    }
+
+    // =====================================================
+    // 3. PRESSURIZED AIRLOCK TUNNEL (segmented ISS-style)
+    // =====================================================
+    const tunnelMat = new THREE.MeshStandardMaterial({
+      map: metalTex, color: 0xc2bdb5, metalness: 0.72, roughness: 0.32
+    });
+    // 3 tunnel sections with docking rings
+    const tunnelPositions = [hz - 11.8, hz - 13.5, hz - 15.2];
+    tunnelPositions.forEach((tz, ti) => {
+      const tGeo = new THREE.CylinderGeometry(2.0, 2.0, 2.4, 20);
+      const t = new THREE.Mesh(tGeo, tunnelMat);
+      t.rotation.x = Math.PI / 2;
+      t.position.set(hx, hy + 1.9, tz);
+      t.castShadow = true;
+      group.add(t);
+
+      // Docking ring between sections
+      const dockGeo = new THREE.TorusGeometry(2.1, 0.14, 8, 24);
+      const dock = new THREE.Mesh(dockGeo, ringMat);
+      dock.rotation.x = Math.PI / 2;
+      dock.position.set(hx, hy + 1.9, tz - 1.2);
+      group.add(dock);
+    });
+
+    // Tunnel top handrail bar
+    const railGeo = new THREE.CylinderGeometry(0.055, 0.055, 6.0, 8);
+    const railMat = new THREE.MeshStandardMaterial({ color: 0x999288, metalness: 0.9, roughness: 0.2 });
+    const rail = new THREE.Mesh(railGeo, railMat);
+    rail.rotation.z = Math.PI / 2;
+    rail.position.set(hx, hy + 4.1, hz - 13.0);
+    group.add(rail);
+
+    // EVA equipment stowage box on tunnel side
+    const stowGeo = new THREE.BoxGeometry(0.9, 0.7, 1.4);
+    const stowMat = new THREE.MeshStandardMaterial({ color: 0xf5a623, metalness: 0.5, roughness: 0.5 });
+    const stow = new THREE.Mesh(stowGeo, stowMat);
+    stow.position.set(hx + 2.4, hy + 2.6, hz - 13.0);
+    group.add(stow);
+
+    // =====================================================
+    // 4. AIRLOCK DOOR (pressure door with hardware)
+    // =====================================================
+    const doorFrameGeo = new THREE.BoxGeometry(3.0, 3.6, 0.5);
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x3a3835, metalness: 0.85, roughness: 0.3 });
     const doorFrame = new THREE.Mesh(doorFrameGeo, frameMat);
-    doorFrame.position.set(hx, hy + 1.9, hz - 14.2);
+    doorFrame.position.set(hx, hy + 1.9, hz - 16.4);
     group.add(doorFrame);
 
-    const doorGeo = new THREE.BoxGeometry(2.2, 2.7, 0.2);
-    const doorMat = new THREE.MeshStandardMaterial({ color: 0xd9531e, metalness: 0.4, roughness: 0.4 });
+    const doorGeo = new THREE.BoxGeometry(2.3, 2.9, 0.22);
+    const doorMat = new THREE.MeshStandardMaterial({ color: 0xd0510e, metalness: 0.55, roughness: 0.4 });
     this.airlockDoorMesh = new THREE.Mesh(doorGeo, doorMat);
-    this.airlockDoorMesh.position.set(hx, hy + 1.9, hz - 14.1);
+    this.airlockDoorMesh.position.set(hx, hy + 1.9, hz - 16.3);
     this.airlockDoorMesh.opened = false;
     group.add(this.airlockDoorMesh);
 
-    const beaconGeo = new THREE.CylinderGeometry(0.2, 0.2, 1.2, 8);
-    const beaconMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff });
-    const beacon = new THREE.Mesh(beaconGeo, beaconMat);
-    beacon.position.set(hx, hy + 11.5, hz);
-    group.add(beacon);
+    // Door wheel/locking handle
+    const wheelGeo = new THREE.TorusGeometry(0.42, 0.065, 8, 20);
+    const handleMat = new THREE.MeshStandardMaterial({ color: 0xd0a800, metalness: 0.9, roughness: 0.2 });
+    const wheel = new THREE.Mesh(wheelGeo, handleMat);
+    wheel.position.set(hx, hy + 1.9, hz - 16.2);
+    group.add(wheel);
 
+    // Spokes on door wheel
+    for (let s = 0; s < 4; s++) {
+      const spokeGeo = new THREE.BoxGeometry(0.06, 0.78, 0.06);
+      const spoke = new THREE.Mesh(spokeGeo, handleMat);
+      spoke.rotation.z = (s / 4) * Math.PI;
+      spoke.position.set(hx, hy + 1.9, hz - 16.17);
+      group.add(spoke);
+    }
+
+    // Pressure equalization LED strip on door frame (green = safe)
+    const ledGeo = new THREE.BoxGeometry(0.08, 2.4, 0.06);
+    const ledMat = new THREE.MeshBasicMaterial({ color: 0x00ff88 });
+    const led = new THREE.Mesh(ledGeo, ledMat);
+    led.position.set(hx + 1.35, hy + 1.9, hz - 16.3);
+    group.add(led);
+
+    // =====================================================
+    // 5. EXTERNAL UTILITY MODULES
+    // =====================================================
+
+    // ECLSS Life-support backpack module (rear of dome)
+    const eclssGeo = new THREE.BoxGeometry(2.8, 2.2, 1.6);
+    const eclssMat = new THREE.MeshStandardMaterial({
+      color: 0xd8d4ca, metalness: 0.55, roughness: 0.45
+    });
+    const eclss = new THREE.Mesh(eclssGeo, eclssMat);
+    eclss.position.set(hx, hy + 5.5, hz + 11.5);
+    eclss.castShadow = true;
+    group.add(eclss);
+
+    // ECLSS pipe connections
+    const pipeM = new THREE.MeshStandardMaterial({ color: 0x8899aa, metalness: 0.9, roughness: 0.2 });
+    [[0.6, 0], [-0.6, 0]].forEach(([ox]) => {
+      const pGeo = new THREE.CylinderGeometry(0.1, 0.1, 2.5, 8);
+      const p = new THREE.Mesh(pGeo, pipeM);
+      p.rotation.z = Math.PI / 2;
+      p.position.set(hx + ox * 2, hy + 5.5, hz + 10.4);
+      group.add(p);
+    });
+
+    // Thermal radiator panels (pair flanking dome)
+    const radMat = new THREE.MeshStandardMaterial({
+      color: 0xf0ede6, metalness: 0.15, roughness: 0.6, emissive: 0xffeecc, emissiveIntensity: 0.04
+    });
+    [[-1, 7.5], [1, 7.5]].forEach(([side]) => {
+      const radGeo = new THREE.BoxGeometry(0.08, 4.0, 2.4);
+      const rad = new THREE.Mesh(radGeo, radMat);
+      rad.position.set(hx + side * 11.8, hy + 5.5, hz);
+      rad.rotation.z = side * 0.38;
+      rad.castShadow = true;
+      group.add(rad);
+      // Radiator tube grid lines
+      for (let t = 0; t < 5; t++) {
+        const tGeo = new THREE.BoxGeometry(0.12, 0.05, 2.4);
+        const tMesh = new THREE.Mesh(tGeo, new THREE.MeshStandardMaterial({ color: 0xaabbc0, metalness: 0.8 }));
+        tMesh.position.set(hx + side * 11.8, hy + 3.8 + t * 0.5, hz);
+        group.add(tMesh);
+      }
+    });
+
+    // Sensor/camera mast near dome apex
+    const mastGeo = new THREE.CylinderGeometry(0.07, 0.09, 3.5, 8);
+    const mast = new THREE.Mesh(mastGeo, ribMat);
+    mast.position.set(hx + 2.5, hy + 10.2, hz + 1.5);
+    group.add(mast);
+
+    const camBoxGeo = new THREE.BoxGeometry(0.28, 0.2, 0.22);
+    const camMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.9 });
+    [0, 0.4].forEach(offset => {
+      const cam = new THREE.Mesh(camBoxGeo, camMat);
+      cam.position.set(hx + 2.5, hy + 11.95 + offset, hz + 1.5);
+      group.add(cam);
+    });
+
+    // Utility flood lights mounted on dome exterior (3 positions)
+    const lightFixMat = new THREE.MeshStandardMaterial({ color: 0xd0cdc8, metalness: 0.8 });
+    [[hz - 14, hx + 2.5, hy + 3.0, 0xfff4d0],
+     [hz - 14, hx - 2.5, hy + 3.0, 0xfff4d0],
+     [hz + 11, hx,       hy + 7.5, 0xfff0cc]].forEach(([fz, fx, fy, lc]) => {
+      const fixGeo = new THREE.BoxGeometry(0.3, 0.2, 0.4);
+      const fix = new THREE.Mesh(fixGeo, lightFixMat);
+      fix.position.set(fx, fy, fz);
+      group.add(fix);
+      const pt = new THREE.PointLight(lc, 1.8, 14);
+      pt.position.set(fx, fy - 0.3, fz);
+      group.add(pt);
+    });
+
+    // =====================================================
+    // 6. ROTATING STROBE BEACON ASSEMBLY (dome apex)
+    // =====================================================
+    this.habitatBeaconGroup = new THREE.Group();
+    this.habitatBeaconGroup.position.set(hx, hy + 11.6, hz);
+
+    const poleGeo = new THREE.CylinderGeometry(0.07, 0.09, 1.0, 8);
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.9 });
+    const pole = new THREE.Mesh(poleGeo, poleMat);
+    pole.position.y = 0.5;
+    this.habitatBeaconGroup.add(pole);
+
+    const lensGeo = new THREE.SphereGeometry(0.22, 12, 10);
+    this.habitatBeaconLens = new THREE.Mesh(lensGeo, new THREE.MeshBasicMaterial({ color: 0x00e5ff }));
+    this.habitatBeaconLens.position.y = 1.1;
+    this.habitatBeaconGroup.add(this.habitatBeaconLens);
+    this.habitatBeaconLight = new THREE.PointLight(0x00e5ff, 2.5, 18);
+    this.habitatBeaconLight.position.y = 1.1;
+    this.habitatBeaconGroup.add(this.habitatBeaconLight);
+
+    group.add(this.habitatBeaconGroup);
+
+    // =====================================================
+    // FINALIZE
+    // =====================================================
     this.scene.add(group);
 
     this.colliders.push({
@@ -3157,6 +1851,214 @@ class GameEngine3D {
     this.scene.add(this.rover);
   }
 
+  createDetailedSupplyCrate(podType, index, labelCode) {
+    const group = new THREE.Group();
+
+    // 1. Heavy composite reinforced chassis
+    const bodyGeo = new THREE.BoxGeometry(1.25, 0.76, 0.95);
+    const bodyColor = podType === 'o2' ? 0x243242 : podType === 'water' ? 0x223832 : 0x3d3024;
+    const bodyMat = new THREE.MeshStandardMaterial({
+      color: bodyColor,
+      metalness: 0.65,
+      roughness: 0.35
+    });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.castShadow = true;
+    body.receiveShadow = true;
+    group.add(body);
+
+    // 2. Corner bumpers (8 shock-absorbing rubberized composite corner brackets)
+    const bumperMat = new THREE.MeshStandardMaterial({ color: 0x181a1d, roughness: 0.9, metalness: 0.2 });
+    const cornerGeo = new THREE.BoxGeometry(0.18, 0.18, 0.18);
+    for (const cx of [-0.63, 0.63]) {
+      for (const cy of [-0.38, 0.38]) {
+        for (const cz of [-0.48, 0.48]) {
+          const bumper = new THREE.Mesh(cornerGeo, bumperMat);
+          bumper.position.set(cx, cy, cz);
+          group.add(bumper);
+        }
+      }
+    }
+
+    // 3. Exoskeletal structural ribs along perimeter
+    const ribMat = new THREE.MeshStandardMaterial({ color: 0x2f353d, metalness: 0.8, roughness: 0.25 });
+    const ribGeoX = new THREE.BoxGeometry(1.28, 0.08, 0.08);
+    for (const rz of [-0.46, 0.46]) {
+      for (const ry of [-0.36, 0.36]) {
+        const rib = new THREE.Mesh(ribGeoX, ribMat);
+        rib.position.set(0, ry, rz);
+        group.add(rib);
+      }
+    }
+
+    // 4. Pressure seal latch clamps (safety yellow)
+    const latchMat = new THREE.MeshStandardMaterial({ color: 0xf5a623, metalness: 0.5, roughness: 0.4 });
+    const latchGeo = new THREE.BoxGeometry(0.08, 0.12, 0.04);
+    for (const lx of [-0.35, 0.35]) {
+      const latch = new THREE.Mesh(latchGeo, latchMat);
+      latch.position.set(lx, 0.1, 0.49);
+      group.add(latch);
+    }
+
+    // 5. LED Status Strip & glowing point light
+    let ledColorHex = 0x00e5ff;
+    if (podType === 'water') ledColorHex = 0x00ff88;
+    else if (podType === 'food') ledColorHex = 0xffaa00;
+
+    const ledMat = new THREE.MeshBasicMaterial({ color: ledColorHex });
+    const ledStrip = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.04, 0.02), ledMat);
+    ledStrip.position.set(0, 0.24, 0.485);
+    group.add(ledStrip);
+
+    const crateLight = new THREE.PointLight(ledColorHex, 1.2, 5);
+    crateLight.position.set(0, 0.3, 0.6);
+    group.add(crateLight);
+
+    // 6. Pod-specific exterior payload hardware:
+    if (podType === 'o2') {
+      // Twin pressurized cryogenic O2 cylinders on top rack
+      const tankGeo = new THREE.CylinderGeometry(0.11, 0.11, 0.82, 12);
+      tankGeo.rotateZ(Math.PI / 2);
+      const tankMat = new THREE.MeshStandardMaterial({ color: 0xe0e6ed, metalness: 0.85, roughness: 0.2 });
+      for (const tz of [-0.18, 0.18]) {
+        const tank = new THREE.Mesh(tankGeo, tankMat);
+        tank.position.set(0, 0.46, tz);
+        group.add(tank);
+
+        const valve = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.08, 8), new THREE.MeshStandardMaterial({ color: 0x00c853 }));
+        valve.rotation.z = Math.PI / 2;
+        valve.position.set(0.44, 0.46, tz);
+        group.add(valve);
+      }
+    } else if (podType === 'water') {
+      // Insulated fluid reservoir tanks & conduits
+      const flaskGeo = new THREE.CylinderGeometry(0.13, 0.13, 0.55, 12);
+      const flaskMat = new THREE.MeshStandardMaterial({ color: 0x4a90e2, metalness: 0.5, roughness: 0.3 });
+      for (const fx of [-0.28, 0.28]) {
+        const flask = new THREE.Mesh(flaskGeo, flaskMat);
+        flask.position.set(fx, 0.44, 0);
+        group.add(flask);
+      }
+      const pipe = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.06, 0.06), ribMat);
+      pipe.position.set(0, 0.55, 0);
+      group.add(pipe);
+    } else if (podType === 'food') {
+      // Thermal freeze-dry cooling radiator heat sink fins
+      const finGeo = new THREE.BoxGeometry(0.025, 0.2, 0.65);
+      const finMat = new THREE.MeshStandardMaterial({ color: 0x8a929e, metalness: 0.9, roughness: 0.2 });
+      for (let i = -4; i <= 4; i++) {
+        const fin = new THREE.Mesh(finGeo, finMat);
+        fin.position.set(i * 0.075, 0.44, 0);
+        group.add(fin);
+      }
+    }
+
+    // 7. Top strobe beacon dome
+    const strobeGeo = new THREE.SphereGeometry(0.07, 10, 8);
+    const strobeMesh = new THREE.Mesh(strobeGeo, ledMat);
+    strobeMesh.position.set(0, podType === 'water' ? 0.68 : 0.62, 0);
+    group.add(strobeMesh);
+
+    // 8. Floating Holographic Waypoint Marker
+    const markerGeo = new THREE.OctahedronGeometry(0.18, 0);
+    const markerMat = new THREE.MeshBasicMaterial({ color: ledColorHex, wireframe: true });
+    const marker = new THREE.Mesh(markerGeo, markerMat);
+    marker.position.set(0, 1.45, 0);
+    group.add(marker);
+
+    if (!this.crateMarkers) this.crateMarkers = [];
+    this.crateMarkers.push({ marker, strobe: strobeMesh, light: crateLight });
+
+    return group;
+  }
+
+  createFlightDataRecorder() {
+    const group = new THREE.Group();
+
+    // 1. Crash-survivable hi-vis safety orange armored housing
+    const casingGeo = new THREE.BoxGeometry(0.85, 0.58, 0.65);
+    const casingMat = new THREE.MeshStandardMaterial({
+      color: 0xff4800, // NASA / FAA crash-survivable emergency safety orange
+      metalness: 0.35,
+      roughness: 0.4
+    });
+    const casing = new THREE.Mesh(casingGeo, casingMat);
+    casing.castShadow = true;
+    casing.receiveShadow = true;
+    group.add(casing);
+
+    // 2. White reflective crash stripes (high contrast visibility)
+    const stripeMat = new THREE.MeshStandardMaterial({ color: 0xf0f0f0, roughness: 0.3 });
+    for (const sx of [-0.22, 0.22]) {
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.59, 0.66), stripeMat);
+      stripe.position.set(sx, 0, 0);
+      group.add(stripe);
+    }
+
+    // 3. Titanium impact roll cage & perimeter brackets
+    const bracketMat = new THREE.MeshStandardMaterial({ color: 0x2d3238, metalness: 0.85, roughness: 0.25 });
+    const railGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.92, 8);
+    railGeo.rotateZ(Math.PI / 2);
+    for (const ry of [-0.28, 0.28]) {
+      for (const rz of [-0.32, 0.32]) {
+        const rail = new THREE.Mesh(railGeo, bracketMat);
+        rail.position.set(0, ry, rz);
+        group.add(rail);
+      }
+    }
+
+    // 4. Underwater/Surface Acoustic Pinger Transducer (Brass cylinder on front face)
+    const pingerGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.35, 12);
+    pingerGeo.rotateZ(Math.PI / 2);
+    const pingerMat = new THREE.MeshStandardMaterial({ color: 0xcca033, metalness: 0.9, roughness: 0.2 });
+    const pinger = new THREE.Mesh(pingerGeo, pingerMat);
+    pinger.position.set(0.36, -0.05, 0.34);
+    group.add(pinger);
+
+    // 5. Hinged Access Lid (Top)
+    const lidGroup = new THREE.Group();
+    lidGroup.position.set(0, 0.29, -0.28); // Pivot axis at rear top edge
+    const lidMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.78, 0.06, 0.58),
+      new THREE.MeshStandardMaterial({ color: 0x1a1e22, metalness: 0.7, roughness: 0.3 })
+    );
+    lidMesh.position.set(0, 0.03, 0.29);
+    lidGroup.add(lidMesh);
+
+    // Keypad / Telemetry display screen on lid
+    const screenMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.38, 0.22),
+      new THREE.MeshBasicMaterial({ color: 0x00ffcc })
+    );
+    screenMesh.rotation.x = -Math.PI / 2;
+    screenMesh.position.set(0, 0.065, 0.29);
+    lidGroup.add(screenMesh);
+
+    group.add(lidGroup);
+    this.flightRecorderLid = lidGroup;
+
+    // 6. High-Intensity Flashing Emergency Strobe Beacon Dome
+    const strobeGeo = new THREE.SphereGeometry(0.09, 12, 10);
+    this.flightRecorderStrobeMat = new THREE.MeshBasicMaterial({ color: 0xff3300 });
+    const strobeMesh = new THREE.Mesh(strobeGeo, this.flightRecorderStrobeMat);
+    strobeMesh.position.set(-0.25, 0.36, 0.15);
+    group.add(strobeMesh);
+
+    // Dynamic Emergency Beacon PointLight
+    this.flightRecorderLight = new THREE.PointLight(0xff4400, 2.5, 16);
+    this.flightRecorderLight.position.set(-0.25, 0.6, 0.15);
+    group.add(this.flightRecorderLight);
+
+    // 7. Large Floating Holographic Waypoint Diamond (visible above rocks!)
+    const beaconGeo = new THREE.OctahedronGeometry(0.32, 0);
+    const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff5500, wireframe: true });
+    this.flightRecorderWaypoint = new THREE.Mesh(beaconGeo, beaconMat);
+    this.flightRecorderWaypoint.position.set(0, 2.0, 0);
+    group.add(this.flightRecorderWaypoint);
+
+    return group;
+  }
+
   // ==========================================
   // SPAWN MISSION-SPECIFIC INTERACTABLES
   // ==========================================
@@ -3186,23 +2088,49 @@ class GameEngine3D {
     const crateMat = new THREE.MeshStandardMaterial({ color: 0xdd6622, metalness: 0.3, roughness: 0.6 });
 
     if (missionId === 1) {
-      // 1. Mission Flight Terminal (Flight Data Recorder)
-      const terminalGeo = new THREE.BoxGeometry(0.8, 1.4, 0.5);
-      const terminalMesh = new THREE.Mesh(terminalGeo, boxMat);
-      addInteractable('terminal', 'keycard_hab', '[E] Access Flight Terminal for Security Keycard', -19, -12, 0.7, terminalMesh, () => {
-        if (!window.gameState.hasItem('keycard_hab')) {
-          window.gameState.addItem('keycard_hab');
-          window.gameState.completeObjective('find_keycard');
-          if (window.soundSystem) window.soundSystem.playRadioBeep();
-          if (window.uiManager) window.uiManager.showBanner("💳 HABITAT ALPHA SECURITY KEYCARD ACQUIRED FROM TERMINAL!");
+      // 1. Suit Patch Kit
+      const patchGeo = new THREE.BoxGeometry(0.4, 0.15, 0.4);
+      const patchMesh = new THREE.Mesh(patchGeo, new THREE.MeshStandardMaterial({ color: 0x00cc88 }));
+      addInteractable('pickup', 'suit_patch', '[E] Pick up Suit Pressure Seal Kit', -14, -8, 0.2, patchMesh, () => {
+        window.gameState.addItem('suit_patch');
+        if (window.uiManager) window.uiManager.showBanner("🩹 SUIT PRESSURE SEAL KIT ACQUIRED! Open Inventory [Tab] to apply.");
+      });
+
+      // 2. Three Highly Detailed Cargo Pods (Oxygen, Water, Food)
+      const crate1 = this.createDetailedSupplyCrate('o2', 1, 'POD A');
+      addInteractable('crate', 'o2_canister', '[E] Search Cargo Pod A (Oxygen)', -23, -16, 0.38, crate1, () => {
+        window.gameState.addItem('o2_canister');
+        window.gameState.incrementObjective('find_supplies');
+        if (window.uiManager) window.uiManager.showBanner("🫁 EMERGENCY O2 CYLINDER ACQUIRED!");
+      });
+
+      const crate2 = this.createDetailedSupplyCrate('water', 2, 'POD B');
+      addInteractable('crate', 'hydration_pack', '[E] Search Cargo Pod B (Water)', -10, -18, 0.38, crate2, () => {
+        window.gameState.addItem('hydration_pack');
+        window.gameState.incrementObjective('find_supplies');
+        if (window.uiManager) window.uiManager.showBanner("💧 ELECTROLYTE HYDRATION PACK ACQUIRED!");
+      });
+
+      const crate3 = this.createDetailedSupplyCrate('food', 3, 'POD C');
+      addInteractable('crate', 'nutrient_paste', '[E] Search Cargo Pod C (Food)', -21, -6, 0.38, crate3, () => {
+        window.gameState.addItem('nutrient_paste');
+        window.gameState.incrementObjective('find_supplies');
+        if (window.uiManager) window.uiManager.showBanner("🥫 CALORIC SURVIVAL PASTE ACQUIRED!");
+      });
+
+      // 3. Ares Rescue Flight Data Recorder ("Black Box") placed prominently at x=-13.5, z=-9.5
+      const recorderMesh = this.createFlightDataRecorder();
+      addInteractable('flight_recorder', 'keycard_hab', '[E] Decrypt Flight Data Recorder (Ares Black Box)', -13.5, -9.5, 0.3, recorderMesh, () => {
+        if (window.gameState.hasItem('keycard_hab')) {
+          if (window.uiManager) window.uiManager.showBanner("Flight data recorder already decrypted and keycard retrieved.");
         } else {
-          if (window.uiManager) window.uiManager.showBanner("💳 Flight Terminal already retrieved: Habitat Alpha Keycard.");
+          if (window.uiManager) window.uiManager.openFlightRecorderModal();
         }
       });
 
-      // 2. Habitat Alpha Airlock Door
+      // 4. Habitat Alpha Airlock Door
       const airlockSensor = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.8, 0.3), new THREE.MeshBasicMaterial({ color: 0x00ff88 }));
-      addInteractable('door', null, '[E] Cycle Habitat Alpha Airlock', 0, 11, 1.8, airlockSensor, () => {
+      addInteractable('door', null, '[E] Cycle Habitat Alpha Airlock', 0, 8.5, 1.8, airlockSensor, () => {
         if (this.airlockDoorMesh && this.airlockDoorMesh.opened) {
           if (window.uiManager) window.uiManager.showBanner("🚪 Airlock already equalized and open.");
           return;
@@ -3237,7 +2165,7 @@ class GameEngine3D {
         if (window.uiManager) window.uiManager.showBanner("⚡ 480V SILICON JUNCTION FUSE ACQUIRED!");
       });
 
-      // 3. Clean 3 Solar Panels
+      // 3. Clean 3 Solar Panels (One-time interaction each!)
       const sx = 45, sz = 22;
       for (let i = 0; i < 3; i++) {
         const px = sx + (i - 1) * 9;
@@ -3292,7 +2220,7 @@ class GameEngine3D {
         if (window.puzzleManager) window.puzzleManager.openWaterPuzzle();
       });
     } else if (missionId === 4) {
-      // 1. Generator Hurricane Latches
+      // 1. Generator Hurricane Latches (One-time interaction!)
       const genMesh = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.5, 1.5), new THREE.MeshStandardMaterial({ color: 0x555555 }));
       const genRecord = addInteractable('generator', null, '[E] Lock Generator Hurricane Latches', 55, -8, 0.8, genMesh, () => {
         if (genRecord.completed) {
@@ -3305,7 +2233,7 @@ class GameEngine3D {
         if (window.uiManager) window.uiManager.showBanner("🔒 BACKUP GENERATOR HURRICANE LATCHES SECURED!");
       });
 
-      // 2. Three Guidance Route Beacons
+      // 2. Three Guidance Route Beacons (One-time activation each!)
       const beaconCoords = [
         { x: 42, z: 5, label: "Beacon Alpha" },
         { x: 26, z: 12, label: "Beacon Beta" },
@@ -3396,6 +2324,7 @@ class GameEngine3D {
       this.keys[e.code] = false;
     });
 
+    // Clear stuck keys if window loses focus
     window.addEventListener('blur', () => {
       this.keys = {};
     });
@@ -3424,6 +2353,31 @@ class GameEngine3D {
 
       this.camera.quaternion.setFromEuler(this.euler);
     });
+
+    // Hold-To-Sprint On-Screen Button Listeners (Touch & Mouse Support)
+    const sprintBtn = document.getElementById('btn-hud-sprint');
+    if (sprintBtn) {
+      const startSprint = (e) => {
+        if (e) e.preventDefault();
+        this.onScreenSprintHeld = true;
+        sprintBtn.classList.add('active');
+      };
+
+      const stopSprint = (e) => {
+        if (e) e.preventDefault();
+        this.onScreenSprintHeld = false;
+        sprintBtn.classList.remove('active');
+      };
+
+      sprintBtn.addEventListener('pointerdown', startSprint);
+      sprintBtn.addEventListener('pointerup', stopSprint);
+      sprintBtn.addEventListener('pointercancel', stopSprint);
+      sprintBtn.addEventListener('pointerleave', stopSprint);
+
+      sprintBtn.addEventListener('touchstart', startSprint, { passive: false });
+      sprintBtn.addEventListener('touchend', stopSprint, { passive: false });
+      sprintBtn.addEventListener('touchcancel', stopSprint, { passive: false });
+    }
   }
 
   toggleFlashlight() {
@@ -3493,27 +2447,123 @@ class GameEngine3D {
   // PHYSICS, ROVER AI & FRAME UPDATE LOOP
   // ==========================================
   update(delta) {
-    if (this.isPrologueActive) {
-      this.updatePrologue(delta);
-      return;
-    }
-    if (this.isEscapeActive) {
-      this.updateSpaceshipEscape(delta);
-      return;
-    }
-    if (this.isCliffhangerActive) {
-      this.updateCliffhanger(delta);
-      return;
-    }
     if (window.gameState.isPaused || window.gameState.inCutscene) return;
+
+    // 1. Keep deep space celestial sphere centered with player camera
+    if (this.skyGroup && this.camera) {
+      this.skyGroup.position.copy(this.camera.position);
+    }
+
+    // 2. Flight Data Recorder emergency strobe flash & beacon diamond rotation
+    if (this.flightRecorderWaypoint) {
+      this.flightRecorderWaypoint.rotation.y += delta * 2.2;
+      this.flightRecorderWaypoint.position.y = 2.0 + Math.sin(this.clock.getElapsedTime() * 4) * 0.12;
+    }
+    if (this.flightRecorderLight) {
+      const flash = Math.sin(this.clock.getElapsedTime() * 8) > 0.35 ? 2.6 : 0.4;
+      this.flightRecorderLight.intensity = flash;
+    }
+
+    // 3. Detailed Supply Crate waypoint markers & LED beacons
+    if (this.crateMarkers) {
+      const t = this.clock.getElapsedTime();
+      this.crateMarkers.forEach((cm, i) => {
+        if (cm.marker) {
+          cm.marker.rotation.y += delta * 1.8;
+          cm.marker.position.y = 1.45 + Math.sin(t * 3.5 + i * 2) * 0.08;
+        }
+      });
+    }
+
+    // 4. Perimeter Warning Beacons (Hazard strobes)
+    if (this.perimeterStrobeMat) {
+      const blink = Math.sin(this.clock.getElapsedTime() * 4) > 0.25 ? 0xff5500 : 0x441100;
+      this.perimeterStrobeMat.color.setHex(blink);
+    }
+
+    // 5a. Habitat Alpha rotating beacon strobe
+    if (this.habitatBeaconGroup) {
+      this.habitatBeaconGroup.rotation.y += delta * 1.4;
+      const t = this.clock.getElapsedTime();
+      const beaconPulse = Math.sin(t * 6.5) > 0.2;
+      if (this.habitatBeaconLens) {
+        this.habitatBeaconLens.material.color.setHex(beaconPulse ? 0x00e5ff : 0x003344);
+      }
+      if (this.habitatBeaconLight) {
+        this.habitatBeaconLight.intensity = beaconPulse ? 3.5 : 0.1;
+      }
+    }
 
     this.updatePlayerMovement(delta);
     this.updateViewModel(delta);
     this.updateRoverAI(delta);
     this.updateDustParticles(delta, this.isStormActive);
-    this.updateCarbonBoxes(delta);
     this.updateRaycasting();
-    this.updateEnvironmentAnimations(delta);
+
+    // 5. Out of Playable Area Detection, Audible Alarm Siren & Hazard Warning
+    const b = this.playableBounds;
+    let distOut = 0;
+    if (this.position.x < b.minX) distOut = Math.max(distOut, b.minX - this.position.x);
+    if (this.position.x > b.maxX) distOut = Math.max(distOut, this.position.x - b.maxX);
+    if (this.position.z < b.minZ) distOut = Math.max(distOut, b.minZ - this.position.z);
+    if (this.position.z > b.maxZ) distOut = Math.max(distOut, this.position.z - b.maxZ);
+
+    const isOutOfBounds = distOut > 0;
+    const vignetteElem = document.getElementById('oob-alarm-vignette');
+    const warningElem = document.getElementById('hud-oob-warning');
+    const timerElem = document.getElementById('oob-timer-text');
+
+    if (isOutOfBounds) {
+      if (!this.isOutOfBounds) {
+        this.isOutOfBounds = true;
+        this.oobTimer = 10.0;
+        if (window.soundSystem) window.soundSystem.playOutOfBoundsAlarm();
+      } else {
+        this.oobTimer -= delta;
+      }
+
+      // Audible high-urgency siren alarm pulses every 0.75 seconds
+      const nowTime = this.clock.getElapsedTime();
+      if (nowTime - this.lastAlarmSoundTime > 0.75) {
+        this.lastAlarmSoundTime = nowTime;
+        if (window.soundSystem) window.soundSystem.playOutOfBoundsAlarm();
+      }
+
+      // Show Flashing Hazard UI & Red Vignette
+      if (vignetteElem) vignetteElem.classList.remove('hidden');
+      if (warningElem) warningElem.classList.remove('hidden');
+      if (timerElem) {
+        const sec = Math.max(1, Math.ceil(this.oobTimer));
+        timerElem.textContent = `EMERGENCY AUTOPILOT RECALL IN ${sec}s — RETURN TO MISSION SECTOR (${Math.round(distOut)}m OUTSIDE)`;
+      }
+
+      // Automatic safety recall if out for 10s or wandered more than 40m
+      if (this.oobTimer <= 0 || distOut > 40) {
+        this.position.x = Math.max(b.minX + 3, Math.min(b.maxX - 3, this.position.x));
+        this.position.z = Math.max(b.minZ + 3, Math.min(b.maxZ - 3, this.position.z));
+        this.position.y = this.getTerrainHeight(this.position.x, this.position.z) + this.playerHeight;
+        this.velocity.set(0, 0, 0);
+        this.isOutOfBounds = false;
+        this.oobTimer = 10.0;
+        if (vignetteElem) vignetteElem.classList.add('hidden');
+        if (warningElem) warningElem.classList.add('hidden');
+        if (window.soundSystem) window.soundSystem.playRadioBeep();
+        if (window.uiManager) {
+          window.uiManager.showBanner("🚀 EMERGENCY AUTOPILOT RECALL: Returned safely to mission sector perimeter.");
+        }
+      }
+    } else {
+      if (this.isOutOfBounds) {
+        this.isOutOfBounds = false;
+        this.oobTimer = 10.0;
+        if (vignetteElem) vignetteElem.classList.add('hidden');
+        if (warningElem) warningElem.classList.add('hidden');
+        if (window.soundSystem) window.soundSystem.playRadioBeep();
+        if (window.uiManager) {
+          window.uiManager.showBanner("✅ RE-ENTERED MISSION AREA — Life support & telemetry stabilized.");
+        }
+      }
+    }
 
     // Check if player is outdoors vs inside Habitat safe haven
     const distToHab = Math.hypot(this.position.x, this.position.z - 25);
@@ -3523,15 +2573,41 @@ class GameEngine3D {
   }
 
   updatePlayerMovement(delta) {
-    const isSprinting = this.keys['ShiftLeft'] || this.keys['ShiftRight'];
+    const isSprinting = this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.onScreenSprintHeld;
     window.gameState.isSprinting = isSprinting;
-    const speed = isSprinting ? 7.2 : 4.2;
+    // Exactly double player speed when sprint is held (4.2 * 2 = 8.4)
+    const speed = isSprinting ? 8.4 : 4.2;
+
+    // Sync on-screen sprint button UI state
+    const sprintBtn = document.getElementById('btn-hud-sprint');
+    if (sprintBtn) {
+      if (isSprinting) sprintBtn.classList.add('active');
+      else sprintBtn.classList.remove('active');
+    }
 
     const moveVector = new THREE.Vector3(0, 0, 0);
+    // Support both WASD and Arrow Keys
     if (this.keys['KeyW'] || this.keys['ArrowUp']) moveVector.z -= 1;
     if (this.keys['KeyS'] || this.keys['ArrowDown']) moveVector.z += 1;
     if (this.keys['KeyA'] || this.keys['ArrowLeft']) moveVector.x -= 1;
     if (this.keys['KeyD'] || this.keys['ArrowRight']) moveVector.x += 1;
+
+    // Dynamic speed lines visual effect
+    const sprintLines = document.getElementById('sprint-lines-fx');
+    if (sprintLines) {
+      if (isSprinting && moveVector.lengthSq() > 0) {
+        sprintLines.classList.add('active');
+      } else {
+        sprintLines.classList.remove('active');
+      }
+    }
+
+    // Dynamic FOV kick while sprinting (smooth transition)
+    const targetFov = isSprinting ? 80 : 72;
+    if (Math.abs(this.camera.fov - targetFov) > 0.05) {
+      this.camera.fov += (targetFov - this.camera.fov) * delta * 8;
+      this.camera.updateProjectionMatrix();
+    }
 
     if (moveVector.lengthSq() > 0) {
       moveVector.normalize();
@@ -3542,7 +2618,7 @@ class GameEngine3D {
       this.velocity.x += (targetVx - this.velocity.x) * 12 * delta;
       this.velocity.z += (targetVz - this.velocity.z) * 12 * delta;
 
-      this.bobTimer += delta * (isSprinting ? 12 : 7.5);
+      this.bobTimer += delta * (isSprinting ? 15 : 7.5);
       if (Math.sin(this.bobTimer) > 0.95 && !this.playedStep) {
         this.playedStep = true;
         const distToHab = Math.hypot(this.position.x, this.position.z - 25);
@@ -3569,13 +2645,14 @@ class GameEngine3D {
     const nextZ = this.position.z + this.velocity.z * delta;
     const nextY = this.position.y + this.velocity.y * delta;
 
-    // Axis-independent collision detection
+    // Axis-independent collision detection for smooth wall-sliding & unsticking
     let canMoveX = true;
     for (const c of this.colliders) {
       if (c.type === 'sphere') {
         const d = Math.hypot(nextX - c.x, this.position.z - c.z);
         if (d < c.radius + this.playerRadius) {
           const curD = Math.hypot(this.position.x - c.x, this.position.z - c.z);
+          // Allow moving away from center if already inside
           if (d <= curD) {
             canMoveX = false;
             break;
@@ -3588,6 +2665,7 @@ class GameEngine3D {
           const centerX = (c.minX + c.maxX) / 2;
           const curDistX = Math.abs(this.position.x - centerX);
           const nextDistX = Math.abs(nextX - centerX);
+          // Allow moving away from center if already inside
           if (nextDistX <= curDistX) {
             canMoveX = false;
             break;
@@ -3619,6 +2697,17 @@ class GameEngine3D {
             break;
           }
         }
+      }
+    }
+
+    // Global terrain boundary limit (prevents walking off the outer edge of the 640m landscape)
+    const maxWorldRadius = 295;
+    const nextDist = Math.hypot(nextX, nextZ);
+    if (nextDist > maxWorldRadius) {
+      const curDist = Math.hypot(this.position.x, this.position.z);
+      if (nextDist >= curDist) {
+        canMoveX = false;
+        canMoveZ = false;
       }
     }
 
@@ -3662,6 +2751,7 @@ class GameEngine3D {
   updateRoverAI(delta) {
     if (!this.rover) return;
 
+    // 1. Waypoint Patrol Interpolation
     const wp = this.roverWaypoints[this.roverCurrentWp];
     const dx = wp.x - this.rover.position.x;
     const dz = wp.z - this.rover.position.z;
@@ -3677,11 +2767,13 @@ class GameEngine3D {
       this.rover.position.y = this.getTerrainHeight(this.rover.position.x, this.rover.position.z);
     }
 
+    // 2. Rotating Hazard Light
     if (this.roverBeaconMat) {
       const blink = Math.sin(this.clock.getElapsedTime() * 10) > 0;
       this.roverBeaconMat.color.setHex(blink ? 0xff2200 : 0x440000);
     }
 
+    // 3. Player Proximity, Searchlight Cone & Occlusion Check
     const toPlayerX = this.position.x - this.rover.position.x;
     const toPlayerZ = this.position.z - this.rover.position.z;
     const distToPlayer = Math.hypot(toPlayerX, toPlayerZ);
@@ -3690,13 +2782,14 @@ class GameEngine3D {
     const forwardZ = Math.cos(this.rover.rotation.y);
     const dot = (toPlayerX * forwardX + toPlayerZ * forwardZ) / Math.max(1, distToPlayer);
 
+    // Line of sight occlusion check with rocks/cover
     let isCovered = false;
     for (const c of this.colliders) {
       if (c.type === 'sphere') {
         const dRoverRock = Math.hypot(c.x - this.rover.position.x, c.z - this.rover.position.z);
         const dPlayerRock = Math.hypot(this.position.x - c.x, this.position.z - c.z);
         if (dRoverRock + dPlayerRock < distToPlayer + 1.2) {
-          isCovered = true;
+          isCovered = true; // Rock is directly between rover and player!
           break;
         }
       }
@@ -3721,6 +2814,7 @@ class GameEngine3D {
       }
     }
 
+    // EMP Shock if caught in searchlight
     if (isAlerted && distToPlayer < 6.5) {
       if (window.soundSystem) window.soundSystem.playSpark();
       window.gameState.resources.energy = Math.max(15, window.gameState.resources.energy - 20);

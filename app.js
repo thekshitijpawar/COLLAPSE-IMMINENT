@@ -26,8 +26,15 @@ class App {
       window.addEventListener('keydown', resumeAudio);
     }
 
-    // 2. Initialize 3D WebGL Engine
-    const success3D = window.gameEngine3D ? window.gameEngine3D.init('webgl-canvas') : false;
+    // 2. Initialize 3D WebGL Engine (Protected Init)
+    let success3D = false;
+    try {
+      if (window.gameEngine3D) {
+        success3D = window.gameEngine3D.init('webgl-canvas');
+      }
+    } catch (err) {
+      console.error("3D Engine init error:", err);
+    }
     if (!success3D) {
       console.warn("3D Engine fallback mode engaging.");
     }
@@ -37,11 +44,29 @@ class App {
       window.uiManager.init();
     }
 
+    // Bulletproof Fail-Safe Direct Button Bindings
+    const btnNewGame = document.getElementById('btn-new-game');
+    if (btnNewGame) {
+      btnNewGame.onclick = (e) => {
+        e.preventDefault();
+        if (window.soundSystem) window.soundSystem.playClick();
+        this.startNewCampaign();
+      };
+    }
+
+    const btnContinue = document.getElementById('btn-continue-game');
+    if (btnContinue) {
+      btnContinue.onclick = (e) => {
+        e.preventDefault();
+        if (window.soundSystem) window.soundSystem.playClick();
+        this.continueCampaign();
+      };
+    }
+
     // 4. Check saved game
     const hasSave = !!localStorage.getItem('mars_beyond_survival_save_v1');
-    const continueBtn = document.getElementById('btn-continue-game');
-    if (continueBtn) {
-      continueBtn.style.display = hasSave ? 'inline-block' : 'none';
+    if (btnContinue) {
+      btnContinue.style.display = hasSave ? 'inline-block' : 'none';
     }
 
     // 5. Start Render / Game Loop
@@ -101,6 +126,13 @@ class App {
       const spawnY = window.gameEngine3D.getTerrainHeight(spawnX, spawnZ) + window.gameEngine3D.playerHeight;
       window.gameEngine3D.position.set(spawnX, spawnY, spawnZ);
       window.gameEngine3D.velocity.set(0, 0, 0);
+      window.gameEngine3D.isOutOfBounds = false;
+      window.gameEngine3D.oobTimer = 10.0;
+
+      const vignette = document.getElementById('oob-alarm-vignette');
+      if (vignette) vignette.classList.add('hidden');
+      const warning = document.getElementById('hud-oob-warning');
+      if (warning) warning.classList.add('hidden');
 
       window.gameEngine3D.buildMissionWorld(missionId);
     }

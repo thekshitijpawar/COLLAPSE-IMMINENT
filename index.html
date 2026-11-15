@@ -11,6 +11,9 @@
   <!-- 3D WebGL Canvas -->
   <div id="webgl-canvas"></div>
 
+  <!-- Dynamic Screen Speed Lines Effect (while sprinting) -->
+  <div id="sprint-lines-fx" class="sprint-lines-fx"></div>
+
   <!-- Helmet Visor & Post-Processing Layers -->
   <div id="helmet-visor-overlay" class="helmet-visor-frame">
     <div class="visor-curvature-mask"></div>
@@ -18,6 +21,18 @@
   </div>
 
   <div id="low-o2-vignette" class="low-o2-vignette hidden"></div>
+
+  <!-- Out-of-Bounds Flashing Red Hazard Vignette -->
+  <div id="oob-alarm-vignette" class="oob-alarm-vignette hidden"></div>
+
+  <!-- Out-of-Bounds Emergency Warning Banner -->
+  <div id="hud-oob-warning" class="hud-oob-warning hidden">
+    <div class="oob-icon">🚨</div>
+    <div class="oob-content">
+      <div class="oob-title font-orbitron">OUT OF PLAYABLE AREA // GEOFENCE BREACHED</div>
+      <div class="oob-subtitle" id="oob-timer-text">EMERGENCY AUTOPILOT RECALL IN 10s — RETURN TO MISSION SECTOR</div>
+    </div>
+  </div>
 
   <!-- First-Person Reticle & Dynamic Interaction Prompt -->
   <div class="reticle-container">
@@ -73,6 +88,9 @@
       <div id="rover-detection-warning" class="hud-alert-banner hidden">
         ⚠️ MALFUNCTIONING ROVER HAULER-9 IN RANGE — SEEK COVER!
       </div>
+      <div id="hud-breach-alert" class="hud-alert-banner hidden">
+        ⚠️ SUIT PRESSURE LEAK — VENTING OXYGEN! USE SEAL KIT IN INVENTORY [TAB]
+      </div>
       <div id="hud-notification-banner" class="hud-toast-banner hidden">
         Notification text
       </div>
@@ -127,6 +145,17 @@
         <span class="badge badge-dim">[M] MAP</span>
         <span class="badge badge-dim">[ESC] PAUSE</span>
       </div>
+
+      <!-- Hold-To-Sprint On-Screen Button -->
+      <div class="hud-panel-glass hud-sprint-panel">
+        <button id="btn-hud-sprint" class="btn-hud-sprint" aria-label="Hold to sprint" title="Hold to sprint (Shift / Touch)">
+          <span class="sprint-icon">⚡</span>
+          <div class="sprint-text-wrap">
+            <span class="sprint-main-label">HOLD TO SPRINT</span>
+            <span class="sprint-sub-label">2X SPEED BOOST</span>
+          </div>
+        </button>
+      </div>
     </footer>
   </div>
 
@@ -141,72 +170,23 @@
     </div>
 
     <div class="menu-buttons-list">
-      <button id="btn-new-game" class="btn btn-primary btn-lg">🚀 START FULL CAMPAIGN (EARTH LAUNCH → MARS)</button>
-      <button id="btn-continue-game" class="btn btn-secondary btn-lg" style="display:none;">▶️ CONTINUE EXPLORATION</button>
-      <button id="btn-prologue-preview" class="btn btn-primary" style="background:linear-gradient(135deg, #1e6ad9, #00d2ff); box-shadow:0 0 16px rgba(0,210,255,0.5); font-weight:800;">🌍 PROLOGUE: SPACEX LAUNCH & MARS LANDING</button>
-      <button id="btn-cliffhanger-preview" class="btn btn-primary" style="background:linear-gradient(135deg, #d9531e, #ff2255); box-shadow:0 0 18px rgba(255,34,85,0.6); font-weight:800;">🐙 CLIFFHANGER: ESCAPE & TENTACLE ATTACK</button>
-      <a href="rescue-failed.html" class="btn btn-secondary" style="text-decoration:none;">📻 "RESCUE FAILED" (AUDIO PREQUEL)</a>
+      <button id="btn-new-game" class="btn btn-primary btn-lg">🚀 NEW MISSION</button>
+      <button id="btn-continue-game" class="btn btn-secondary btn-lg" style="display:none;">▶️ CONTINUE</button>
+      <a href="rescue-failed.html" class="btn btn-secondary" style="text-decoration:none;">📻 "RESCUE FAILED" (CLIFFHANGER)</a>
       <button id="btn-open-archive" class="btn btn-secondary">📂 MISSION ARCHIVE</button>
       <button id="btn-open-science" class="btn btn-secondary">🔬 NASA SCIENCE DOSSIER</button>
       <button id="btn-open-settings" class="btn btn-secondary">⚙️ SETTINGS</button>
     </div>
 
     <div class="menu-footer-credits">
-      Ages 9–15 Accessible • Realistic Photorealistic Mars Physics & Space Exploration • NASA Science
+      Ages 9–15 Accessible • Suspense & Environmental Puzzles • Real NASA Mars Science
     </div>
   </div>
 
   <!-- CINEMATIC CUTSCENE OVERLAY -->
   <div id="cinematic-overlay" class="cinematic-overlay-box hidden">
     <div id="cinematic-text-box"></div>
-  </div>
-
-  <!-- ROCKET LAUNCH & SPACE CINEMATIC OVERLAY (2.39:1 CINEMATIC EXPERIENCE) -->
-  <div id="rocket-cliffhanger-overlay" class="hidden">
-    <!-- 2.39:1 Cinematic Letterbox Bars -->
-    <div class="cinematic-letterbox-bar letterbox-top">
-      <div class="cinematic-header-meta">
-        <span class="cam-indicator-badge" id="cinematic-cam-badge">📹 CAM 01 // KENNEDY LAUNCH MOUNT</span>
-        <button id="btn-skip-cinematic" class="btn-cinematic-skip">SKIP [ESC]</button>
-      </div>
-    </div>
-    <div class="cinematic-letterbox-bar letterbox-bottom">
-      <div class="cinematic-subtitles-bar" id="cinematic-dialogue-subtitles">
-        <!-- Live mission audio captions -->
-      </div>
-    </div>
-
-    <!-- Live Telemetry Subtitles & Mission Control HUD -->
-    <div class="launch-telemetry-hud">
-      <div class="launch-hud-badge">
-        <span class="launch-blink-dot"></span>
-        <span id="launch-seq-phase">LAUNCH SEQUENCE ACTIVE // DSN INTERPLANETARY CARRIER</span>
-      </div>
-      <div id="launch-telemetry-status" class="launch-telemetry-text">
-        T-MINUS 10 SECONDS...
-      </div>
-    </div>
-
-    <!-- Blackout Screen for Climax -->
-    <div id="cliffhanger-blackout" class="cliffhanger-blackout-screen hidden">
-      <div class="cliffhanger-final-content">
-        <div class="cliffhanger-mysterious-icon">🐙</div>
-        <h1 class="cliffhanger-final-title">"SOMETHING FROM BENEATH HAS YOU..."</h1>
-        <p class="cliffhanger-final-subtitle">MARS: BEYOND SURVIVAL — CHAPTER 01 CLIFFHANGER</p>
-        <div class="cliffhanger-divider"></div>
-        <p class="cliffhanger-final-quote" id="cliffhanger-final-quote-text">
-          Commander Reyes fired the Raptor vacuum engines and escaped Martian orbit.<br>
-          Earth was in sight. The survival mission seemed complete.<br>
-          Then... from the cosmic void beneath the hull, a colossal alien tentacle struck.<br>
-          Alarms screaming. Metal twisting into oblivion. Dragged down into the dark...<br>
-          <strong style="color:#ff4466;">TO BE CONTINUED IN CHAPTER 02</strong>
-        </p>
-        <div class="cliffhanger-action-buttons">
-          <button id="btn-replay-cliffhanger" class="btn btn-primary btn-lg">▶️ REPLAY ESCAPE & TENTACLE ATTACK</button>
-          <button id="btn-cliffhanger-mainmenu" class="btn btn-secondary btn-lg">🏠 RETURN TO MAIN MENU</button>
-        </div>
-      </div>
-    </div>
+    <button id="btn-skip-cinematic" class="cinematic-skip-btn">SKIP INTRO [SPACE / CLICK] ⏭</button>
   </div>
 
   <!-- PAUSE MODAL (ESC) -->
@@ -322,21 +302,7 @@
           </div>
           <div>
             <label class="tag-label">MASTER AUDIO VOLUME</label>
-            <input type="range" id="setting-master-vol" min="0" max="100" value="70" style="width:100%;">
-          </div>
-          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
-            <div>
-              <label class="tag-label" style="font-size:11px;">SFX VOLUME</label>
-              <input type="range" id="setting-sfx-vol" min="0" max="100" value="85" style="width:100%;">
-            </div>
-            <div>
-              <label class="tag-label" style="font-size:11px;">AMBIENCE</label>
-              <input type="range" id="setting-ambience-vol" min="0" max="100" value="75" style="width:100%;">
-            </div>
-            <div>
-              <label class="tag-label" style="font-size:11px;">MUSIC</label>
-              <input type="range" id="setting-music-vol" min="0" max="100" value="80" style="width:100%;">
-            </div>
+            <input type="range" id="setting-master-vol" min="0" max="100" style="width:100%;">
           </div>
           <div style="display:flex; align-items:center; justify-content:space-between;">
             <label class="tag-label">HELMET VISOR FRAME</label>
@@ -380,7 +346,10 @@
           <div class="keypad-display">
             <span class="tag-label">SECURITY OVERRIDE PIN</span>
             <div id="recorder-pin-display" class="pin-digits">---</div>
-            <small style="color:#81d4fa; font-family:'Share Tech Mono';">HINT: Stranded Sol Counter Protocol</small>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+              <small style="color:#81d4fa; font-family:'Share Tech Mono';">PIN: SOL 412 PROTOCOL</small>
+              <button class="btn btn-secondary btn-sm" style="padding:2px 8px; font-size:11px;" onclick="window.uiManager.recorderPin='412'; window.uiManager.updatePinDisplay(); window.uiManager.submitPinCode();">AUTO-ENTER (412)</button>
+            </div>
           </div>
 
           <div class="keypad-grid">
