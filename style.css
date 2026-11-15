@@ -1,0 +1,1076 @@
+/* ===================================================================
+   MARS: BEYOND SURVIVAL 🚀
+   style.css — AAA Sci-Fi NASA/JPL Interface, Helmet Visor & 3D HUD
+   =================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap');
+
+:root {
+  --mars-red: #c1440e;
+  --mars-dust: #e77d38;
+  --mars-dark: #120805;
+  --space-black: #060303;
+  --hud-cyan: #00e5ff;
+  --hud-green: #00ff88;
+  --hud-amber: #ffaa00;
+  --hud-red: #ff3333;
+  --hud-bg-glass: rgba(18, 10, 8, 0.82);
+  --hud-border-cyan: rgba(0, 229, 255, 0.35);
+  --hud-border-amber: rgba(255, 170, 0, 0.4);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--space-black);
+  color: #f0f4f8;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 16px;
+}
+
+/* ==========================================
+   3D WEBGL CANVAS
+   ========================================== */
+#webgl-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
+  display: block;
+  cursor: crosshair;
+}
+
+/* ==========================================
+   HELMET VISOR & POST-PROCESSING OVERLAYS
+   ========================================== */
+.helmet-visor-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 5;
+  box-shadow: inset 0 0 110px rgba(0, 0, 0, 0.88), inset 0 0 45px rgba(217, 83, 30, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.visor-curvature-mask {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, transparent 65%, rgba(10, 4, 2, 0.7) 100%);
+  pointer-events: none;
+}
+
+.crt-scanlines {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.22) 50%);
+  background-size: 100% 4px;
+  opacity: 0.45;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.low-o2-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, transparent 40%, rgba(255, 20, 20, 0.55) 100%);
+  pointer-events: none;
+  z-index: 7;
+  animation: pulse-danger 1.2s infinite alternate ease-in-out;
+}
+
+@keyframes pulse-danger {
+  0% { opacity: 0.3; }
+  100% { opacity: 0.95; }
+}
+
+/* ==========================================
+   FIRST PERSON RETICLE & PROMPTS
+   ========================================== */
+.reticle-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.reticle-dot {
+  width: 6px;
+  height: 6px;
+  background-color: var(--hud-cyan);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--hud-cyan);
+}
+
+.reticle-ring {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  border-radius: 50%;
+}
+
+.interaction-prompt-tooltip {
+  margin-top: 18px;
+  background: rgba(12, 6, 4, 0.9);
+  border: 1px solid var(--hud-cyan);
+  color: var(--hud-cyan);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 4px;
+  text-shadow: 0 0 6px rgba(0, 229, 255, 0.6);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+}
+
+/* ==========================================
+   MAIN HUD LAYER
+   ========================================== */
+.hud-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 24px 32px;
+}
+
+/* Top Telemetry & Compass Bar */
+.hud-top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.hud-panel-glass {
+  background: var(--hud-bg-glass);
+  border: 1px solid var(--hud-border-cyan);
+  backdrop-filter: blur(8px);
+  border-radius: 6px;
+  padding: 12px 18px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+}
+
+.mission-header-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.tag-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--hud-amber);
+  letter-spacing: 1.5px;
+}
+
+.mission-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 1px;
+}
+
+.hud-objectives-box {
+  margin-top: 6px;
+  max-width: 380px;
+}
+
+.hud-objectives-box ul {
+  list-style: none;
+}
+
+.obj-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  margin-bottom: 4px;
+  color: #cfd8dc;
+}
+
+.obj-item.completed {
+  color: rgba(0, 255, 136, 0.7);
+  text-decoration: line-through;
+}
+
+.obj-item.active {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* Compass Tape Strip */
+.hud-compass-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.compass-tape {
+  width: 260px;
+  height: 28px;
+  background: rgba(14, 8, 6, 0.85);
+  border: 1px solid var(--hud-border-amber);
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.compass-markings {
+  display: flex;
+  justify-content: space-between;
+  width: 80%;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.compass-center-caret {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--hud-amber);
+  font-size: 10px;
+}
+
+.compass-beacon-diamond {
+  position: absolute;
+  top: 6px;
+  width: 10px;
+  height: 10px;
+  background-color: var(--hud-cyan);
+  transform: rotate(45deg);
+  box-shadow: 0 0 8px var(--hud-cyan);
+  transition: transform 0.08s ease-out;
+}
+
+/* Sol Clock Panel */
+.hud-sol-telemetry {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.telemetry-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.t-val-large {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--hud-cyan);
+}
+
+/* Hazard Alerts Center Banner */
+.hud-center-alerts {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.hud-alert-banner {
+  background: rgba(180, 20, 20, 0.85);
+  border: 2px solid var(--hud-red);
+  color: #fff;
+  padding: 10px 24px;
+  border-radius: 6px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  box-shadow: 0 0 20px rgba(255, 51, 51, 0.7);
+  animation: pulse-danger 0.8s infinite alternate;
+}
+
+.hud-toast-banner {
+  background: rgba(10, 25, 35, 0.9);
+  border: 1px solid var(--hud-cyan);
+  color: #ffffff;
+  padding: 8px 20px;
+  border-radius: 4px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+}
+
+/* Bottom Telemetry: Vitals & Tools */
+.hud-bottom-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  width: 100%;
+}
+
+.vitals-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 290px;
+}
+
+.vital-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.vital-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-family: 'Share Tech Mono', monospace;
+}
+
+.progress-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.2s ease-out;
+}
+
+.fill-cyan { background-color: var(--hud-cyan); box-shadow: 0 0 6px var(--hud-cyan); }
+.fill-green { background-color: var(--hud-green); box-shadow: 0 0 6px var(--hud-green); }
+.fill-amber { background-color: var(--hud-amber); box-shadow: 0 0 6px var(--hud-amber); }
+.fill-red { background-color: var(--hud-red); box-shadow: 0 0 8px var(--hud-red); }
+
+.hud-quick-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* ==========================================
+   BUTTONS & BADGES
+   ========================================== */
+.btn {
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.8px;
+  padding: 10px 18px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: none;
+  outline: none;
+  transition: all 0.2s ease-in-out;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #00b4d8, #0077b6);
+  color: #fff;
+  border: 1px solid var(--hud-cyan);
+  box-shadow: 0 4px 14px rgba(0, 180, 216, 0.35);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #00e5ff, #0096c7);
+  box-shadow: 0 6px 20px rgba(0, 229, 255, 0.6);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: rgba(40, 25, 20, 0.8);
+  color: #e0e0e0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-secondary:hover {
+  background: rgba(70, 45, 35, 0.9);
+  border-color: var(--hud-amber);
+  color: #fff;
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #d90429, #990011);
+  color: #fff;
+  border: 1px solid var(--hud-red);
+}
+
+.btn-sm { padding: 6px 12px; font-size: 11px; }
+.btn-lg { padding: 14px 28px; font-size: 16px; }
+
+.badge {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-weight: 700;
+}
+
+.badge-success { background: rgba(0, 255, 136, 0.2); color: var(--hud-green); border: 1px solid var(--hud-green); }
+.badge-warning { background: rgba(255, 170, 0, 0.2); color: var(--hud-amber); border: 1px solid var(--hud-amber); }
+.badge-danger { background: rgba(255, 51, 51, 0.2); color: var(--hud-red); border: 1px solid var(--hud-red); }
+.badge-dim { background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.5); }
+
+/* ==========================================
+   MODAL DIALOGS & OVERLAYS
+   ========================================== */
+.modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 4, 3, 0.86);
+  backdrop-filter: blur(10px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.modal-dialog {
+  background: #140a08;
+  border: 1px solid var(--hud-border-cyan);
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8), 0 0 25px rgba(0, 229, 255, 0.2);
+  width: 100%;
+  max-width: 680px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: fadeInModal 0.2s ease-out;
+}
+
+@keyframes fadeInModal {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(25, 12, 8, 0.7);
+}
+
+.modal-header h2 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 18px;
+  color: #fff;
+  letter-spacing: 1px;
+}
+
+.btn-close-modal {
+  background: none;
+  border: none;
+  color: #aaa;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.btn-close-modal:hover { color: #fff; }
+
+.modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  background: rgba(20, 10, 6, 0.5);
+}
+
+/* ==========================================
+   MAIN MENU OVERLAY
+   ========================================== */
+.main-menu-container {
+  position: absolute;
+  inset: 0;
+  z-index: 120;
+  background: radial-gradient(circle at center, rgba(35, 15, 10, 0.85) 0%, rgba(8, 3, 2, 0.97) 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.game-title-wrap {
+  text-align: center;
+  margin-bottom: 36px;
+}
+
+.game-brand-sub {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 14px;
+  letter-spacing: 4px;
+  color: var(--hud-amber);
+  margin-bottom: 6px;
+}
+
+.game-title-main {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 44px;
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: 2px;
+  text-shadow: 0 0 25px rgba(231, 125, 56, 0.75);
+}
+
+.menu-buttons-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 280px;
+}
+
+.menu-footer-credits {
+  margin-top: 40px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  text-align: center;
+  font-family: 'Share Tech Mono', monospace;
+}
+
+/* ==========================================
+   INVENTORY GRID MODAL (TAB)
+   ========================================== */
+.inventory-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 20px;
+}
+
+.inv-slots-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.inv-slot {
+  width: 58px;
+  height: 58px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.inv-slot:hover {
+  border-color: var(--hud-cyan);
+  background: rgba(0, 229, 255, 0.1);
+}
+
+.inv-icon { font-size: 26px; }
+
+.inv-details-card {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 16px;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.inv-science-note {
+  font-size: 12px;
+  color: #81d4fa;
+  background: rgba(0, 180, 216, 0.1);
+  padding: 8px;
+  border-left: 2px solid var(--hud-cyan);
+  border-radius: 2px;
+}
+
+/* ==========================================
+   TACTICAL MARS MAP MODAL (M)
+   ========================================== */
+.map-canvas-wrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+#tactical-map-canvas {
+  border: 1px solid var(--hud-border-amber);
+  border-radius: 4px;
+  background-color: #1a0a06;
+}
+
+/* ==========================================
+   INTERACTIVE PUZZLES STYLING
+   ========================================== */
+.puzzle-matrix-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin: 14px 0;
+}
+
+.circuit-cell {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 16px;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.circuit-knob {
+  width: 50px;
+  height: 50px;
+  border: 2px solid var(--hud-amber);
+  border-radius: 50%;
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.2s ease-out;
+}
+
+.circuit-knob::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 16px;
+  background-color: var(--hud-amber);
+}
+
+.circuit-knob.aligned {
+  border-color: var(--hud-green);
+}
+
+.circuit-knob.aligned::after {
+  background-color: var(--hud-green);
+}
+
+.valve-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+/* ==========================================
+   FLIGHT RECORDER KEYPAD
+   ========================================== */
+.keypad-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin: 12px 0;
+}
+
+.keypad-display {
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--hud-border-amber);
+  border-radius: 6px;
+  padding: 12px 24px;
+  text-align: center;
+  width: 100%;
+  max-width: 280px;
+}
+
+.pin-digits {
+  font-family: 'Orbitron', monospace;
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: 12px;
+  color: var(--hud-cyan);
+  text-shadow: 0 0 12px rgba(0, 229, 255, 0.6);
+  margin: 6px 0;
+}
+
+.keypad-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: 100%;
+  max-width: 280px;
+}
+
+.keypad-btn {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.keypad-btn:hover {
+  background: rgba(0, 229, 255, 0.2);
+  border-color: var(--hud-cyan);
+  transform: translateY(-1px);
+}
+
+.keypad-btn:active {
+  transform: translateY(1px);
+}
+
+/* ==========================================
+   NASA SCIENCE DOSSIER CARDS
+   ========================================== */
+.science-card {
+  background: rgba(10, 18, 25, 0.6);
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  border-radius: 6px;
+  padding: 14px 18px;
+}
+
+.science-card-header h4 {
+  font-family: 'Orbitron', sans-serif;
+  color: var(--hud-cyan);
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+
+.science-source {
+  font-size: 11px;
+  color: var(--hud-amber);
+  font-family: 'Share Tech Mono', monospace;
+}
+
+.science-card-text {
+  font-size: 13px;
+  line-height: 1.45;
+  color: #cfd8dc;
+  margin: 8px 0;
+}
+
+.link-nasa {
+  color: var(--hud-cyan);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.link-nasa:hover { text-decoration: underline; }
+
+/* ==========================================
+   CINEMATICS & CLIFFHANGER
+   ========================================== */
+.cinematic-overlay-box {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.cinematic-text {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 22px;
+  color: #ffffff;
+  line-height: 1.6;
+  text-align: center;
+  letter-spacing: 1px;
+  animation: fadeInText 0.6s ease-in;
+}
+
+@keyframes fadeInText {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.cliffhanger-box {
+  text-align: center;
+  max-width: 650px;
+}
+
+/* ==========================================
+   ROCKET LAUNCH CINEMATIC CLIFFHANGER SYSTEM
+   ========================================== */
+#rocket-cliffhanger-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 150;
+}
+
+.cinematic-letterbox-bar {
+  position: absolute;
+  left: 0;
+  width: 100vw;
+  height: 9vh;
+  background-color: #000000;
+  z-index: 160;
+  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.letterbox-top {
+  top: 0;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+}
+
+.cinematic-header-meta {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cam-indicator-badge {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  color: #00e5ff;
+  letter-spacing: 2px;
+  background: rgba(0, 229, 255, 0.12);
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  padding: 4px 12px;
+  border-radius: 4px;
+  text-shadow: 0 0 8px rgba(0, 229, 255, 0.6);
+}
+
+.btn-cinematic-skip {
+  background: rgba(255, 255, 255, 0.1);
+  color: #cfd8dc;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-cinematic-skip:hover {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  border-color: #ffffff;
+}
+
+.letterbox-bottom {
+  bottom: 0;
+  box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 30px;
+}
+
+.cinematic-subtitles-bar {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  color: #ffe0b2;
+  letter-spacing: 1.5px;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95);
+  text-align: center;
+}
+
+.launch-telemetry-hud {
+  position: absolute;
+  bottom: 12vh;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 170;
+  text-align: center;
+  max-width: 90vw;
+}
+
+.launch-hud-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(12, 6, 4, 0.85);
+  border: 1px solid rgba(255, 170, 0, 0.5);
+  padding: 4px 14px;
+  border-radius: 4px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: var(--hud-amber);
+  letter-spacing: 2px;
+  backdrop-filter: blur(6px);
+}
+
+.launch-blink-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--hud-red);
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--hud-red);
+  animation: blinkFast 0.8s infinite alternate;
+}
+
+@keyframes blinkFast {
+  0% { opacity: 0.2; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1.2); }
+}
+
+.launch-telemetry-text {
+  font-family: 'Orbitron', monospace;
+  font-size: 26px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 3px;
+  text-shadow: 0 0 15px rgba(255, 170, 0, 0.7), 0 2px 10px rgba(0, 0, 0, 0.9);
+  transition: all 0.3s ease;
+}
+
+/* BLACKOUT CLIMAX SCREEN */
+.cliffhanger-blackout-screen {
+  position: fixed;
+  inset: 0;
+  background-color: #000000;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity 1.2s ease-in;
+}
+
+.cliffhanger-blackout-screen.visible {
+  opacity: 1;
+}
+
+.cliffhanger-final-content {
+  text-align: center;
+  max-width: 800px;
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.cliffhanger-mysterious-icon {
+  font-size: 40px;
+  color: var(--hud-cyan);
+  text-shadow: 0 0 25px var(--hud-cyan);
+  animation: pulseGlow 2.5s infinite alternate ease-in-out;
+}
+
+@keyframes pulseGlow {
+  0% { opacity: 0.4; transform: scale(0.9); }
+  100% { opacity: 1; transform: scale(1.1); }
+}
+
+.cliffhanger-final-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(28px, 4.5vw, 48px);
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  text-shadow: 0 0 35px rgba(0, 229, 255, 0.7), 0 0 70px rgba(0, 229, 255, 0.3);
+  animation: fadeInSlow 1.8s ease-out;
+}
+
+@keyframes fadeInSlow {
+  from { opacity: 0; transform: translateY(16px); letter-spacing: 10px; }
+  to { opacity: 1; transform: translateY(0); letter-spacing: 5px; }
+}
+
+.cliffhanger-final-subtitle {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 17px;
+  color: var(--hud-amber);
+  letter-spacing: 4px;
+}
+
+.cliffhanger-divider {
+  width: 140px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--hud-cyan), transparent);
+  margin: 6px 0;
+}
+
+.cliffhanger-final-quote {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: #b0bec5;
+  line-height: 1.6;
+  max-width: 620px;
+}
+
+.cliffhanger-action-buttons {
+  display: flex;
+  gap: 18px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Utilities */
+.hidden { display: none !important; }
+.text-green { color: var(--hud-green); }
+.text-amber { color: var(--hud-amber); }
+.text-cyan { color: var(--hud-cyan); }
+.text-red { color: var(--hud-red); }
+.text-white { color: #ffffff; }
+.font-orbitron { font-family: 'Orbitron', sans-serif; }
+.font-bold { font-weight: 700; }

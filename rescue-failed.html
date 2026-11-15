@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RESCUE FAILED 🚀 | A Mars Survival Cliffhanger</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --mars-red: #d94e28;
+      --mars-dark: #120402;
+      --mars-sky-top: #1a0604;
+      --mars-sky-bottom: #943319;
+      --hud-cyan: #00e5ff;
+      --hud-amber: #ffaa00;
+      --hud-red: #ff2a2a;
+      --hud-green: #00ff88;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--mars-dark);
+      color: #f0f4f8;
+      font-family: 'Rajdhani', sans-serif;
+    }
+
+    /* Screen shake wrapper */
+    #shake-wrapper {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Background Canvas */
+    #space-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* CRT Scanlines & Vignette */
+    .crt-scanlines {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.35) 50%);
+      background-size: 100% 4px;
+      opacity: 0.5;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .vignette {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at center, transparent 55%, rgba(10, 2, 2, 0.85) 100%);
+      pointer-events: none;
+      z-index: 11;
+    }
+
+    /* Flash Overlay (Impact) */
+    #flash-overlay {
+      position: absolute;
+      inset: 0;
+      background: #ffffff;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 25;
+      transition: opacity 0.08s ease-out;
+    }
+
+    /* Static / Glitch Overlay */
+    #glitch-overlay {
+      position: absolute;
+      inset: 0;
+      background: repeating-radial-gradient(#000 0 0.0001%, #fff 0 0.0002%);
+      background-size: 200% 200%;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 30;
+      mix-blend-mode: hard-light;
+    }
+
+    /* TOP CORNER HUD: OXYGEN COUNTDOWN & BIO-TELEMETRY */
+    .top-telemetry-bar {
+      position: absolute;
+      top: 24px;
+      left: 32px;
+      right: 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      z-index: 20;
+      pointer-events: none;
+    }
+
+    .hud-box {
+      background: rgba(18, 6, 4, 0.82);
+      border: 1px solid rgba(217, 78, 40, 0.4);
+      backdrop-filter: blur(8px);
+      padding: 12px 20px;
+      border-radius: 6px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
+    }
+
+    .hud-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--hud-amber);
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .hud-val-large {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      color: #fff;
+    }
+
+    .oxygen-timer {
+      color: var(--hud-cyan);
+      text-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+    }
+
+    .oxygen-timer.critical {
+      color: var(--hud-red);
+      text-shadow: 0 0 12px rgba(255, 42, 42, 0.7);
+      animation: pulse-red 1s infinite alternate;
+    }
+
+    @keyframes pulse-red {
+      0% { opacity: 0.6; }
+      100% { opacity: 1; }
+    }
+
+    /* RADIO TRANSMISSION CONSOLE (BOTTOM CENTER) */
+    .transmission-container {
+      position: absolute;
+      bottom: 36px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90%;
+      max-width: 820px;
+      z-index: 20;
+    }
+
+    .transmission-box {
+      background: rgba(14, 4, 3, 0.92);
+      border: 1px solid var(--mars-red);
+      border-radius: 8px;
+      padding: 20px 26px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.9), 0 0 25px rgba(217, 78, 40, 0.25);
+    }
+
+    .transmission-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 12px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid rgba(217, 78, 40, 0.3);
+    }
+
+    .channel-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--hud-cyan);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .signal-led {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--hud-green);
+      box-shadow: 0 0 8px var(--hud-green);
+      animation: blink-signal 1.2s infinite;
+    }
+
+    @keyframes blink-signal {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.2; }
+    }
+
+    /* Oscilloscope Wave */
+    .audio-wave-wrap {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      height: 16px;
+    }
+
+    .wave-bar {
+      width: 3px;
+      height: 6px;
+      background: var(--hud-cyan);
+      border-radius: 1px;
+      animation: wave-bounce 0.8s infinite ease-in-out alternate;
+    }
+
+    @keyframes wave-bounce {
+      0% { height: 4px; }
+      100% { height: 16px; }
+    }
+
+    /* Transmission Logs */
+    .transmission-log {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      height: 130px;
+      overflow-y: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .log-line {
+      opacity: 0;
+      transform: translateY(6px);
+      animation: logFadeIn 0.35s forwards ease-out;
+    }
+
+    @keyframes logFadeIn {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .log-reyes { color: #80d8ff; }
+    .log-telemetry { color: var(--hud-amber); }
+    .log-pilot { color: #ff5252; font-weight: bold; }
+    .log-alert { color: var(--hud-red); font-weight: bold; text-shadow: 0 0 8px rgba(255, 42, 42, 0.6); }
+    .log-unknown { color: #b388ff; font-weight: bold; text-shadow: 0 0 10px rgba(179, 136, 255, 0.8); letter-spacing: 1px; }
+
+    .typing-cursor {
+      display: inline-block;
+      width: 8px;
+      height: 14px;
+      background: var(--hud-cyan);
+      margin-left: 4px;
+      animation: cursorBlink 0.7s infinite;
+      vertical-align: middle;
+    }
+
+    @keyframes cursorBlink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    /* FINAL "TO BE CONTINUED..." MODAL */
+    #final-screen {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at center, rgba(30, 8, 4, 0.95) 0%, rgba(5, 1, 1, 0.99) 100%);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 1.2s ease-in;
+    }
+
+    #final-screen.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .final-content {
+      text-align: center;
+      max-width: 720px;
+    }
+
+    .final-tag {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 14px;
+      color: var(--hud-amber);
+      letter-spacing: 4px;
+      margin-bottom: 12px;
+    }
+
+    .final-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 48px;
+      font-weight: 900;
+      color: var(--hud-red);
+      letter-spacing: 3px;
+      text-shadow: 0 0 35px rgba(255, 42, 42, 0.75);
+      margin-bottom: 16px;
+    }
+
+    .final-quote {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 24px;
+      font-weight: 600;
+      color: #e0d0cc;
+      line-height: 1.5;
+      margin-bottom: 30px;
+    }
+
+    .final-quote span {
+      color: #b388ff;
+      font-style: italic;
+    }
+
+    .final-actions {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      padding: 14px 28px;
+      border-radius: 4px;
+      cursor: pointer;
+      text-decoration: none;
+      border: none;
+      outline: none;
+      transition: all 0.2s ease-in-out;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #d94e28, #94250e);
+      color: #fff;
+      border: 1px solid var(--hud-amber);
+      box-shadow: 0 4px 20px rgba(217, 78, 40, 0.4);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #ff6b3d, #ba3012);
+      box-shadow: 0 6px 25px rgba(255, 107, 61, 0.6);
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      background: rgba(30, 15, 12, 0.85);
+      color: var(--hud-cyan);
+      border: 1px solid var(--hud-cyan);
+      box-shadow: 0 4px 15px rgba(0, 229, 255, 0.2);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(0, 229, 255, 0.15);
+      color: #fff;
+      transform: translateY(-2px);
+    }
+
+    /* Start Overlay Button */
+    #start-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(8, 2, 2, 0.88);
+      z-index: 150;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      cursor: pointer;
+    }
+
+    .start-prompt {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 26px;
+      color: #ffffff;
+      letter-spacing: 2px;
+      animation: pulse-prompt 1.2s infinite alternate;
+    }
+
+    @keyframes pulse-prompt {
+      0% { opacity: 0.5; transform: scale(0.98); }
+      100% { opacity: 1; transform: scale(1.02); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Screen Shake Wrapper -->
+  <div id="shake-wrapper">
+
+    <!-- 2D Canvas: Red Mars Sky, Animated Stars & Falling Rocket -->
+    <canvas id="space-canvas"></canvas>
+
+    <!-- Scanlines, Vignette & Flash Effects -->
+    <div class="crt-scanlines"></div>
+    <div class="vignette"></div>
+    <div id="flash-overlay"></div>
+    <div id="glitch-overlay"></div>
+
+    <!-- TOP TELEMETRY BAR -->
+    <header class="top-telemetry-bar">
+      <div class="hud-box">
+        <span class="hud-label">SURVIVOR STATUS</span>
+        <div class="hud-val-large">COMMANDER REYES</div>
+        <small style="color:#aaa; font-family:'Share Tech Mono';">HABITAT ALPHA • SOL 412 ON MARS</small>
+      </div>
+
+      <div class="hud-box" style="text-align: right;">
+        <span class="hud-label">LIFE SUPPORT RESERVES</span>
+        <div id="oxygen-display" class="hud-val-large oxygen-timer">Oxygen: 14 days left</div>
+        <small id="oxygen-subtext" style="color:#81d4fa; font-family:'Share Tech Mono';">14d 07h 42m 18s</small>
+      </div>
+    </header>
+
+    <!-- RADIO TRANSMISSION LOG CONSOLE -->
+    <main class="transmission-container">
+      <div class="transmission-box">
+        <div class="transmission-header">
+          <div class="channel-title">
+            <span class="signal-led"></span>
+            <span>RADIO FREQUENCY 142.85 MHz // EMERGENCY DESCENT LINK</span>
+          </div>
+          <div class="audio-wave-wrap">
+            <div class="wave-bar" style="animation-delay: 0.1s;"></div>
+            <div class="wave-bar" style="animation-delay: 0.3s;"></div>
+            <div class="wave-bar" style="animation-delay: 0.2s;"></div>
+            <div class="wave-bar" style="animation-delay: 0.5s;"></div>
+            <div class="wave-bar" style="animation-delay: 0.4s;"></div>
+          </div>
+        </div>
+
+        <div id="transmission-log" class="transmission-log">
+          <!-- Text lines will appear here line by line -->
+        </div>
+      </div>
+    </main>
+
+    <!-- FINAL CLIFFHANGER "TO BE CONTINUED..." SCREEN -->
+    <div id="final-screen">
+      <div class="final-content">
+        <div class="final-tag">TRANSMISSION SEVERED • SOL 412</div>
+        <h1 class="final-title">TO BE CONTINUED...</h1>
+        <p class="final-quote">
+          "Don't go to the wreckage, Reyes.<br>
+          <span>It wasn't an accident.</span>"
+        </p>
+
+        <div class="final-actions">
+          <button id="btn-replay" class="btn btn-secondary" onclick="restartExperience()">🔄 REPLAY TRANSMISSION</button>
+          <a href="index.html" class="btn btn-primary">🚀 PLAY MARS: BEYOND SURVIVAL (3D GAME) →</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- INITIAL CLICK-TO-PLAY OVERLAY (Audio Policy) -->
+    <div id="start-overlay" onclick="startExperience()">
+      <div style="font-family:'Share Tech Mono'; color:var(--hud-amber); letter-spacing:4px;">NASA ARES MISSION ARCHIVE</div>
+      <h1 style="font-family:'Orbitron'; font-size:42px; color:#fff; text-shadow:0 0 25px rgba(217,78,40,0.8);">RESCUE FAILED</h1>
+      <div class="start-prompt">▶ CLICK ANYWHERE TO INITIALIZE AUDIO & TRANSMISSION</div>
+      <div style="font-family:'Share Tech Mono'; font-size:12px; color:#aaa; margin-top:14px;">Interactive Mars Survival Cliffhanger</div>
+    </div>
+
+  </div>
+
+  <script>
+    // ==========================================
+    // PROCEDURAL WEB AUDIO SYNTHESIZER
+    // ==========================================
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.master = null;
+        this.rocketOsc = null;
+        this.rocketGain = null;
+        this.windNode = null;
+      }
+
+      init() {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AudioCtx();
+        this.master = this.ctx.createGain();
+        this.master.gain.setValueAtTime(0.7, this.ctx.currentTime);
+        this.master.connect(this.ctx.destination);
+
+        this.startWind();
+      }
+
+      startWind() {
+        if (!this.ctx) return;
+        const bufSize = this.ctx.sampleRate * 2;
+        const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        let b0 = 0, b1 = 0;
+        for (let i = 0; i < bufSize; i++) {
+          const w = Math.random() * 2 - 1;
+          b0 = 0.99 * b0 + w * 0.05;
+          b1 = 0.95 * b1 + w * 0.1;
+          data[i] = (b0 + b1) * 0.2;
+        }
+        this.windNode = this.ctx.createBufferSource();
+        this.windNode.buffer = buf;
+        this.windNode.loop = true;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(320, this.ctx.currentTime);
+        filter.Q.setValueAtTime(2.5, this.ctx.currentTime);
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+
+        this.windNode.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.master);
+        this.windNode.start();
+      }
+
+      startRocketThruster() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const osc2 = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const filter = this.ctx.createBiquadFilter();
+
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(75, this.ctx.currentTime);
+
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(110, this.ctx.currentTime);
+
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(350, this.ctx.currentTime);
+
+        gain.gain.setValueAtTime(0.001, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.18, this.ctx.currentTime + 1.5);
+
+        osc.connect(filter);
+        osc2.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.master);
+
+        osc.start();
+        osc2.start();
+
+        this.rocketOsc = osc;
+        this.rocketOsc2 = osc2;
+        this.rocketGain = gain;
+      }
+
+      sputterRocketEngine() {
+        if (!this.rocketGain || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        // Engine sputter oscillation
+        this.rocketGain.gain.setValueAtTime(0.18, now);
+        this.rocketGain.gain.setValueAtTime(0.02, now + 0.15);
+        this.rocketGain.gain.setValueAtTime(0.22, now + 0.35);
+        this.rocketGain.gain.setValueAtTime(0.01, now + 0.55);
+        this.rocketGain.gain.setValueAtTime(0.15, now + 0.75);
+        this.rocketGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.8);
+      }
+
+      playCrashExplosion() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+
+        // Low deep explosion rumble
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(120, now);
+        osc.frequency.exponentialRampToValueAtTime(30, now + 2.2);
+
+        gain.gain.setValueAtTime(0.4, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 2.5);
+
+        osc.connect(gain);
+        gain.connect(this.master);
+        osc.start(now);
+        osc.stop(now + 2.5);
+
+        // Noise blast
+        const bufSize = this.ctx.sampleRate * 1.5;
+        const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufSize * 0.3));
+        }
+        const src = this.ctx.createBufferSource();
+        src.buffer = buf;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(450, now);
+        const noiseGain = this.ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.35, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
+
+        src.connect(filter);
+        filter.connect(noiseGain);
+        noiseGain.connect(this.master);
+        src.start(now);
+      }
+
+      playBeep() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1400 + Math.random() * 300, this.ctx.currentTime);
+        gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
+        osc.connect(gain);
+        gain.connect(this.master);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.04);
+      }
+
+      playAlarmTone() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(880, now);
+        osc.frequency.setValueAtTime(660, now + 0.12);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+        osc.connect(gain);
+        gain.connect(this.master);
+        osc.start(now);
+        osc.stop(now + 0.28);
+      }
+
+      playStaticBurst() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const bufSize = this.ctx.sampleRate * 0.6;
+        const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) {
+          data[i] = (Math.random() * 2 - 1) * 0.4;
+        }
+        const src = this.ctx.createBufferSource();
+        src.buffer = buf;
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.22, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+        src.connect(gain);
+        gain.connect(this.master);
+        src.start(now);
+      }
+
+      playMysteriousVoiceChime() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        [220, 277.18, 329.63].forEach((f, i) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(f, now + i * 0.1);
+          gain.gain.setValueAtTime(0.14, now + i * 0.1);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 1.2);
+          osc.connect(gain);
+          gain.connect(this.master);
+          osc.start(now + i * 0.1);
+          osc.stop(now + i * 0.1 + 1.2);
+        });
+      }
+    }
+
+    const sound = new SoundEngine();
+
+    // ==========================================
+    // CANVASES & ANIMATED ROCKET ENGINE
+    // ==========================================
+    const canvas = document.getElementById('space-canvas');
+    const ctx = canvas.getContext('2d');
+    const shakeWrapper = document.getElementById('shake-wrapper');
+    const flashOverlay = document.getElementById('flash-overlay');
+    const glitchOverlay = document.getElementById('glitch-overlay');
+
+    let w = window.innerWidth;
+    let h = window.innerHeight;
+
+    function resize() {
+      w = canvas.width = window.innerWidth;
+      h = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Stars
+    const stars = [];
+    for (let i = 0; i < 160; i++) {
+      stars.push({
+        x: Math.random() * w,
+        y: Math.random() * (h * 0.65),
+        radius: Math.random() * 1.5 + 0.5,
+        alpha: Math.random() * 0.7 + 0.3
+      });
+    }
+
+    // Rocket State
+    const rocket = {
+      active: false,
+      x: 0,
+      y: -100,
+      vx: 0,
+      vy: 0,
+      angle: 0,
+      vAngle: 0,
+      flameSize: 25,
+      smokeParticles: [],
+      state: 'idle', // 'descending', 'malfunction', 'crashed'
+      impactX: 0,
+      impactY: 0,
+      explosionParticles: []
+    };
+
+    function triggerRocketDescent() {
+      rocket.active = true;
+      rocket.x = w * 0.62;
+      rocket.y = -60;
+      rocket.vx = -1.2;
+      rocket.vy = 2.4;
+      rocket.angle = 0.05;
+      rocket.vAngle = 0;
+      rocket.state = 'descending';
+      sound.startRocketThruster();
+    }
+
+    function triggerRocketMalfunction() {
+      rocket.state = 'malfunction';
+      rocket.vAngle = 0.18; // Spin out of control!
+      rocket.vx = -3.2;
+      rocket.vy = 4.8;
+      sound.sputterRocketEngine();
+    }
+
+    function triggerRocketCrash() {
+      rocket.state = 'crashed';
+      rocket.impactX = rocket.x;
+      rocket.impactY = h * 0.72; // Horizon line
+
+      // Screen Flash
+      flashOverlay.style.opacity = '1';
+      setTimeout(() => { flashOverlay.style.opacity = '0'; }, 180);
+
+      // Screen Shake
+      shakeScreen(35, 1200);
+
+      // Sound
+      sound.playCrashExplosion();
+
+      // Create explosion fire particles
+      for (let i = 0; i < 80; i++) {
+        const speed = Math.random() * 14 + 3;
+        const angle = Math.random() * Math.PI;
+        rocket.explosionParticles.push({
+          x: rocket.impactX,
+          y: rocket.impactY,
+          vx: Math.cos(angle) * speed,
+          vy: -Math.sin(angle) * speed,
+          radius: Math.random() * 12 + 4,
+          life: 1.0,
+          decay: Math.random() * 0.02 + 0.015,
+          color: Math.random() > 0.4 ? '#ff5500' : '#ffcc00'
+        });
+      }
+    }
+
+    function shakeScreen(magnitude, durationMs) {
+      const start = performance.now();
+      function doShake(now) {
+        const elapsed = now - start;
+        if (elapsed < durationMs) {
+          const factor = 1 - elapsed / durationMs;
+          const sx = (Math.random() - 0.5) * magnitude * factor;
+          const sy = (Math.random() - 0.5) * magnitude * factor;
+          shakeWrapper.style.transform = `translate(${sx}px, ${sy}px)`;
+          requestAnimationFrame(doShake);
+        } else {
+          shakeWrapper.style.transform = 'translate(0, 0)';
+        }
+      }
+      requestAnimationFrame(doShake);
+    }
+
+    function triggerGlitch(durationMs = 900) {
+      glitchOverlay.style.opacity = '0.75';
+      sound.playStaticBurst();
+      setTimeout(() => {
+        glitchOverlay.style.opacity = '0';
+      }, durationMs);
+    }
+
+    // Main Draw & Animation Loop
+    function render() {
+      ctx.clearRect(0, 0, w, h);
+
+      // 1. Martian Sky Gradient (Deep blackish-red to rusty amber horizon)
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
+      skyGrad.addColorStop(0, '#0c0302');
+      skyGrad.addColorStop(0.45, '#2e0a05');
+      skyGrad.addColorStop(0.72, '#963419');
+      skyGrad.addColorStop(1, '#d94e28');
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      // 2. Stars
+      ctx.fillStyle = '#ffffff';
+      stars.forEach(s => {
+        ctx.globalAlpha = s.alpha * (0.8 + Math.sin(Date.now() * 0.003 + s.x) * 0.2);
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.globalAlpha = 1.0;
+
+      // 3. Layered Mars Horizon & Mountains Silhouette
+      drawMarsHorizon();
+
+      // 4. Update & Draw Descending Rocket
+      if (rocket.active && rocket.state !== 'crashed') {
+        rocket.x += rocket.vx;
+        rocket.y += rocket.vy;
+        rocket.angle += rocket.vAngle;
+
+        // Smoke particles
+        if (rocket.state === 'malfunction' && Math.random() < 0.7) {
+          rocket.smokeParticles.push({
+            x: rocket.x,
+            y: rocket.y,
+            vx: (Math.random() - 0.5) * 2,
+            vy: (Math.random() - 0.5) * 2,
+            radius: Math.random() * 8 + 4,
+            alpha: 0.8
+          });
+        }
+
+        drawRocket(rocket.x, rocket.y, rocket.angle, rocket.state === 'descending');
+
+        // Check crash ground impact
+        if (rocket.y >= h * 0.72) {
+          triggerRocketCrash();
+        }
+      }
+
+      // 5. Draw Smoke Particles
+      for (let i = rocket.smokeParticles.length - 1; i >= 0; i--) {
+        const p = rocket.smokeParticles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.radius += 0.4;
+        p.alpha -= 0.015;
+        ctx.fillStyle = `rgba(30, 20, 20, ${p.alpha})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+        if (p.alpha <= 0) rocket.smokeParticles.splice(i, 1);
+      }
+
+      // 6. Draw Explosion Particles
+      for (let i = rocket.explosionParticles.length - 1; i >= 0; i--) {
+        const ep = rocket.explosionParticles[i];
+        ep.x += ep.vx;
+        ep.y += ep.vy;
+        ep.vy += 0.35; // Gravity
+        ep.radius = Math.max(1, ep.radius - 0.2);
+        ep.life -= ep.decay;
+
+        ctx.fillStyle = ep.color;
+        ctx.globalAlpha = Math.max(0, ep.life);
+        ctx.beginPath();
+        ctx.arc(ep.x, ep.y, ep.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+
+        if (ep.life <= 0) rocket.explosionParticles.splice(i, 1);
+      }
+
+      requestAnimationFrame(render);
+    }
+
+    function drawMarsHorizon() {
+      // Distant ridge
+      ctx.fillStyle = '#40120b';
+      ctx.beginPath();
+      ctx.moveTo(0, h * 0.76);
+      ctx.bezierCurveTo(w * 0.25, h * 0.72, w * 0.45, h * 0.79, w * 0.7, h * 0.73);
+      ctx.bezierCurveTo(w * 0.85, h * 0.70, w * 0.95, h * 0.76, w, h * 0.74);
+      ctx.lineTo(w, h);
+      ctx.lineTo(0, h);
+      ctx.fill();
+
+      // Near Dunes
+      ctx.fillStyle = '#210603';
+      ctx.beginPath();
+      ctx.moveTo(0, h * 0.82);
+      ctx.bezierCurveTo(w * 0.3, h * 0.78, w * 0.6, h * 0.86, w, h * 0.81);
+      ctx.lineTo(w, h);
+      ctx.lineTo(0, h);
+      ctx.fill();
+    }
+
+    function drawRocket(rx, ry, angle, isFiring) {
+      ctx.save();
+      ctx.translate(rx, ry);
+      ctx.rotate(angle);
+
+      // Retro Thruster Flame
+      if (isFiring || (rocket.state === 'malfunction' && Math.random() > 0.4)) {
+        ctx.fillStyle = '#ffaa00';
+        ctx.beginPath();
+        ctx.moveTo(-6, 24);
+        ctx.lineTo(0, 24 + Math.random() * 25 + 15);
+        ctx.lineTo(6, 24);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(-3, 24);
+        ctx.lineTo(0, 24 + Math.random() * 12 + 8);
+        ctx.lineTo(3, 24);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Rocket Body (Ares Rescue)
+      ctx.fillStyle = '#eeeeee';
+      ctx.beginPath();
+      ctx.moveTo(0, -28); // Nose cone
+      ctx.lineTo(10, -10);
+      ctx.lineTo(10, 22);
+      ctx.lineTo(-10, 22);
+      ctx.lineTo(-10, -10);
+      ctx.closePath();
+      ctx.fill();
+
+      // Mission Stripe (NASA Red)
+      ctx.fillStyle = '#d94e28';
+      ctx.fillRect(-10, 4, 20, 6);
+
+      // Rocket Fins
+      ctx.fillStyle = '#333333';
+      ctx.beginPath();
+      ctx.moveTo(-10, 14);
+      ctx.lineTo(-18, 24);
+      ctx.lineTo(-10, 24);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(10, 14);
+      ctx.lineTo(18, 24);
+      ctx.lineTo(10, 24);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    requestAnimationFrame(render);
+
+    // ==========================================
+    // STORY TRANSMISSION SEQUENCE
+    // ==========================================
+    const transmissionLog = document.getElementById('transmission-log');
+    const oxygenDisplay = document.getElementById('oxygen-display');
+    const oxygenSubtext = document.getElementById('oxygen-subtext');
+    const finalScreen = document.getElementById('final-screen');
+
+    let oxygenSecondsRemaining = 14 * 86400 + 7 * 3600 + 42 * 60 + 18;
+
+    // Ticking oxygen countdown
+    setInterval(() => {
+      if (oxygenSecondsRemaining > 0) {
+        oxygenSecondsRemaining--;
+        const days = Math.floor(oxygenSecondsRemaining / 86400);
+        const hrs = Math.floor((oxygenSecondsRemaining % 86400) / 3600);
+        const mins = Math.floor((oxygenSecondsRemaining % 3600) / 60);
+        const secs = Math.floor(oxygenSecondsRemaining % 60);
+
+        oxygenDisplay.textContent = `Oxygen: ${days} days left`;
+        oxygenSubtext.textContent = `${days}d ${String(hrs).padStart(2,'0')}h ${String(mins).padStart(2,'0')}m ${String(secs).padStart(2,'0')}s`;
+      }
+    }, 1000);
+
+    const script = [
+      {
+        delay: 800,
+        type: 'log',
+        class: 'log-reyes',
+        text: 'COMMANDER REYES [SOL 412 - 16:40 LST]: "After 412 days stranded in Acidalia Planitia... my rescue is finally here."'
+      },
+      {
+        delay: 3400,
+        type: 'log',
+        class: 'log-telemetry',
+        text: 'ARES RESCUE TELEMETRY: "Orbital retro-burn confirmed. Entering Martian atmosphere. Descent speed: Mach 2.4."'
+      },
+      {
+        delay: 6200,
+        type: 'action',
+        action: () => triggerRocketDescent()
+      },
+      {
+        delay: 6800,
+        type: 'log',
+        class: 'log-reyes',
+        text: 'COMMANDER REYES: "I can see their plasma contrail through the Hab viewport. She looks beautiful."'
+      },
+      {
+        delay: 9600,
+        type: 'log',
+        class: 'log-alert',
+        sound: 'alarm',
+        text: '⚠️ EMERGENCY TELEMETRY ALERT: "CRITICAL FAILURE IN SECONDARY GIMBAL! ENGINE 2 HAS FLAMED OUT!"'
+      },
+      {
+        delay: 11800,
+        type: 'action',
+        action: () => triggerRocketMalfunction()
+      },
+      {
+        delay: 12200,
+        type: 'log',
+        class: 'log-pilot',
+        text: 'ARES RESCUE PILOT: "We\'ve lost attitude control! RCS thrusters unresponsive! We\'re tumbling— BRACE FOR IMP—"'
+      },
+      {
+        delay: 15400,
+        type: 'log',
+        class: 'log-alert',
+        text: '💥 IMPACT DETECTED: SEVERE SEISMIC SPIKE. CRASH SITE ESTIMATED 2.1 KM NORTH-WEST.'
+      },
+      {
+        delay: 17800,
+        type: 'log',
+        class: 'log-telemetry',
+        text: 'TELEMETRY CARRIER: NO SIGNAL. ZERO BIO-VITAL TELEMETRY RETURNED FROM WRECKAGE.'
+      },
+      {
+        delay: 20200,
+        type: 'action',
+        action: () => triggerGlitch(1200)
+      },
+      {
+        delay: 21600,
+        type: 'log',
+        class: 'log-unknown',
+        sound: 'voice',
+        text: '📻 UNKNOWN VOICE [FREQUENCY OVERRIDE]: "Don\'t go to the wreckage, Reyes."'
+      },
+      {
+        delay: 25200,
+        type: 'log',
+        class: 'log-unknown',
+        text: '📻 UNKNOWN VOICE: "It wasn\'t an accident."'
+      },
+      {
+        delay: 28400,
+        type: 'action',
+        action: () => {
+          triggerGlitch(800);
+          finalScreen.classList.add('visible');
+        }
+      }
+    ];
+
+    let scriptIndex = 0;
+    let isRunning = false;
+
+    function runScript() {
+      if (!isRunning || scriptIndex >= script.length) return;
+      const step = script[scriptIndex];
+
+      setTimeout(() => {
+        if (!isRunning) return;
+
+        if (step.type === 'log') {
+          appendLog(step.text, step.class);
+          if (step.sound === 'alarm') sound.playAlarmTone();
+          else if (step.sound === 'voice') sound.playMysteriousVoiceChime();
+          else sound.playBeep();
+        } else if (step.type === 'action') {
+          step.action();
+        }
+
+        scriptIndex++;
+        runScript();
+      }, scriptIndex === 0 ? step.delay : (script[scriptIndex].delay - script[scriptIndex - 1].delay));
+    }
+
+    function appendLog(text, className) {
+      const line = document.createElement('div');
+      line.className = `log-line ${className}`;
+      line.textContent = text;
+      transmissionLog.appendChild(line);
+
+      // Auto scroll to bottom
+      transmissionLog.scrollTop = transmissionLog.scrollHeight;
+    }
+
+    function startExperience() {
+      document.getElementById('start-overlay').style.display = 'none';
+      sound.init();
+      isRunning = true;
+      scriptIndex = 0;
+      transmissionLog.innerHTML = '';
+      runScript();
+    }
+
+    function restartExperience() {
+      finalScreen.classList.remove('visible');
+      rocket.active = false;
+      rocket.state = 'idle';
+      rocket.smokeParticles = [];
+      rocket.explosionParticles = [];
+      transmissionLog.innerHTML = '';
+      isRunning = true;
+      scriptIndex = 0;
+      runScript();
+    }
+  </script>
+
+</body>
+</html>
